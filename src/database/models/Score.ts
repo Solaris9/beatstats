@@ -41,7 +41,7 @@ export default class Score extends Model {
     @Column declare playCount: number;
 
     @HasOne(() => ScoreImprovement, 'scoreId')
-    declare scoreImprovement: ScoreImprovement;
+    declare scoreImprovement: ScoreImprovement | null;
     
     @HasOne(() => ScoreOffsets, 'scoreId')
     declare offsets: ScoreOffsets;

@@ -377,7 +377,7 @@ export default async (score: Score) => {
 
     //#region scores
 
-    const isScoreImprovement = score.scoreImprovement.score != 0 || score.scoreImprovement.pp != 0;
+    const isScoreImprovement = score.scoreImprovement?.score != 0 || score.scoreImprovement?.pp != 0;
 
     if (isScoreImprovement) {
         topScoreConfig.y! -= 20;
@@ -414,7 +414,7 @@ export default async (score: Score) => {
     }
 
     if (score.leaderboard.type != LeaderboardType.Unranked) {
-        const ppChange = score.scoreImprovement.pp > 0 ? "+" : "";
+        const ppChange = isScoreImprovement && score.scoreImprovement!.pp > 0 ? "+" : "";
 
         layer.add(
             ppRect,
@@ -423,7 +423,7 @@ export default async (score: Score) => {
 
         if (isScoreImprovement)
             layer.add(
-                centerText(`${ppChange}${score.scoreImprovement.pp.toFixed(2)}pp`, 35, {
+                centerText(`${ppChange}${score.scoreImprovement?.pp.toFixed(2)}pp`, 35, {
                     ...topOpts,
                     x: leftCol,
                     y: topScoreConfig.y! + 45
@@ -439,9 +439,9 @@ export default async (score: Score) => {
     );
 
     if (isScoreImprovement) {
-        const accImprovement = (score.scoreImprovement.accuracy * 100).toFixed(2);
-        const accChange = score.scoreImprovement.accuracy > 0 ? "+" : "";
-        const scoreChange = score.scoreImprovement.score > 0 ? "+" : "";
+        const accImprovement = (score.scoreImprovement!.accuracy * 100).toFixed(2);
+        const accChange = score.scoreImprovement!.accuracy > 0 ? "+" : "";
+        const scoreChange = score.scoreImprovement!.score > 0 ? "+" : "";
         
         layer.add(
             centerText(`${accChange}${accImprovement}%`, 35, {
@@ -449,7 +449,7 @@ export default async (score: Score) => {
                 x: middleCol,
                 y: topScoreConfig.y! + 45
             }),
-            centerText(`${scoreChange}${format(score.scoreImprovement.score)}`, 35, {
+            centerText(`${scoreChange}${format(score.scoreImprovement!.score)}`, 35, {
                 ...topOpts,
                 x: rightCol,
                 y: topScoreConfig.y! + 45
@@ -498,10 +498,10 @@ export default async (score: Score) => {
     let rightColImproveWidth = 0;
 
     if (isScoreImprovement) {
-        const leftAccImprovement = ` ${score.scoreImprovement.accLeft > 0 ? "+" : ""}${score.scoreImprovement.accLeft.toFixed(2)}`;
-        const rightAccImprovement = ` ${score.scoreImprovement.accRight > 0 ? "+" : ""}${score.scoreImprovement.accRight.toFixed(2)}`;
+        const leftAccImprovement = ` ${score.scoreImprovement!.accLeft > 0 ? "+" : ""}${score.scoreImprovement!.accLeft.toFixed(2)}`;
+        const rightAccImprovement = ` ${score.scoreImprovement!.accRight > 0 ? "+" : ""}${score.scoreImprovement!.accRight.toFixed(2)}`;
 
-        const mistakes = (score.badCuts + score.missedNotes) - score.scoreImprovement.badCuts - score.scoreImprovement.missedNotes;
+        const mistakes = (score.badCuts + score.missedNotes) - score.scoreImprovement!.badCuts - score.scoreImprovement!.missedNotes;
         const comboImprovement = " vs " + (mistakes != 0 ? `${mistakes}X` : "FC");
         
         leftColImproveWidth = improvementText.measureSize(leftAccImprovement).width;
