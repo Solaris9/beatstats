@@ -3,7 +3,7 @@ import { beatleader } from "../../api.js";
 import { IPlayer } from "../../types/beatleader.js";
 import { DataTypes, Op } from "sequelize";
 import Score from "./Score.js";
-import User, { createUser } from "./User.js";
+import User, { CreateUserMethod, createUser } from "./User.js";
 import { logger } from "../../interactions/clan.js";
 
 @Table
@@ -72,39 +72,38 @@ export default class Clan extends Model {
         for (let member of members) {
             let user = await User.find(member.id);
 
-            // user does not exist in the database
-            if (!user) {
-                const discordSocial = member.socials?.find(s => s.service == "Discord");
-                if (!discordSocial) {
-                    logger.warning(`Clan member ${member.name} (${member.id}) does not have Discord linked!`);
-                    continue;
-                }
-                
-                const existing = await User.findOne({
-                    where: { discord: discordSocial.userId },
-                    attributes: { exclude: ["createdAt", "updatedAt"] }
-                }) as User;
-            
-                if (!existing) {
-                    // if not existing then create new one
-                    logger.warning(`Clan member ${member.name} (${member.id}) does not have a profile with the bot! Creating new one`);
-                    await createUser(discordSocial.userId, member, true);
-                    user = await User.find(member.id) as User;
-                } else {
-                    // exist migrate old ID to new ID
-                    await User.destroy({ where: { beatleader } });
-                    await User.destroy({ where: { discord: discordSocial.userId } });
+            if (user) {
+                await user.refresh();
+                continue;
+            }
+            // else user does not exist in the database
 
-                    const json = existing.toJSON();
-                    json.beatleader = member.id;
-
-                    user = await User.create(json);
-
-                    logger.info(`Migrated user ${member.name} to new id (${existing.beatleader} -> ${user.beatleader})`);
-                }
+            const discordSocial = member.socials?.find(s => s.service == "Discord");
+            if (!discordSocial) {
+                logger.warning(`Clan member ${member.name} (${member.id}) does not have Discord linked!`);
+                await createUser(CreateUserMethod.BeatLeader, member.id, member);
+                continue;
             }
 
-            await user.refresh();
+            // migrate any new profiles
+            const existing = await User.findOne({
+                where: {
+                    discord: discordSocial.userId,
+                    beatleader: { [Op.not]: member.id }
+                },
+                attributes: { exclude: ["createdAt", "updatedAt"] }
+            }) as User;
+
+            if (existing) {
+                await User.destroy({ where: { beatleader: existing.beatleader } });
+
+                const json = existing.toJSON();
+                json.beatleader = member.id;
+
+                user = await User.create(json);
+
+                logger.info(`Migrated user ${member.name} to new id (${existing.beatleader} -> ${user.beatleader})`);
+            }
         }
     }
 

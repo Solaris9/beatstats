@@ -5,7 +5,7 @@ import { User } from "../database";
 import { Logger } from "../utils/logger";
 import Clan from "../database/models/Clan";
 import { Op } from "sequelize";
-import { createUser } from "../database/models/User";
+import { CreateUserMethod, createUser } from "../database/models/User";
 
 export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
 
@@ -109,7 +109,7 @@ export class ClanCommands extends Command {
 
     async setup(interaction: ChatInputCommandInteraction) {        
         const discord = interaction.user.id;
-        const user = await createUser(discord, undefined, true);
+        const user = await createUser(CreateUserMethod.Discord, discord);
         
         if (!user) {
             await interaction.reply({

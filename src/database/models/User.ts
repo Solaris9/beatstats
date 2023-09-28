@@ -49,40 +49,24 @@ export default class User extends Model {
     @AllowNull @Column
     declare youtubeEnabled: boolean;
 
-    async refresh(full = false, force = false) {
-        logger.info(`Refreshing user ${this.name} (${this.beatleader}, ${this.discord})`);
-        const profile = await beatleader.player[this.beatleader].get_json();
+    async refresh(full = false, force = false, basic = true) {        
+        if (basic) {
+            logger.info(`Refreshing user ${this.name ?? "N/A"} (${this.beatleader}, ${this.discord})`);
+            const profile = await beatleader.player[this.beatleader].get_json();
 
-        this.name = profile.name;
-        this.country = profile.country;
-        this.avatar = profile.avatar;
-        this.clans = profile.clans.map(c => c.tag).join(",");
-        
-        this.totalPP = profile.pp;
-        this.passPP = profile.passPp;
-        this.accPP = profile.accPp;
-        this.techPP = profile.techPp;
-        this.topPP = profile.scoreStats.topPp;
+            this.name = profile.name;
+            this.country = profile.country;
+            this.avatar = profile.avatar;
+            this.clans = profile.clans.map(c => c.tag).join(",");
+            
+            this.totalPP = profile.pp;
+            this.passPP = profile.passPp;
+            this.accPP = profile.accPp;
+            this.techPP = profile.techPp;
+            this.topPP = profile.scoreStats.topPp;
 
-        this.accuracyRankedAverage = profile.scoreStats.averageRankedAccuracy;
-        this.accuracyRankedWeightedAverage = profile.scoreStats.averageWeightedRankedAccuracy;
-
-        const twitch = profile.socials?.find(s => s.service == "Twitch");
-        if (twitch) {
-            this.twitch = twitch.link.slice(twitch.link.lastIndexOf("/") + 1);
-            if (!this.twitchLast) this.twitchLast = Date.now();
-        }
-        
-        const youtube = profile.socials?.find(s => s.service == "YouTube");
-        if (youtube) {
-            this.youtube = youtube.link.slice(youtube.link.lastIndexOf("/") + 1);
-
-            if (!this.youtubeLast) {
-                const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${this.youtube}`;
-                const feed = await parse(url) as YoutubeFeed;
-                
-                if (feed.items.length) this.youtubeLast = feed.items[0].id;
-            }
+            this.accuracyRankedAverage = profile.scoreStats.averageRankedAccuracy;
+            this.accuracyRankedWeightedAverage = profile.scoreStats.averageWeightedRankedAccuracy;
         }
 
         if (full) {
@@ -153,21 +137,33 @@ export default class User extends Model {
     }
 }
 
-export const createUser = async (discord: string, player?: IPlayer, update = false) => {
-    player ??= await beatleader.player.discord[discord].get_json().catch(() => undefined);
+export enum CreateUserMethod {
+    Discord,
+    BeatLeader
+}
+
+export const createUser = async (method: CreateUserMethod, id: string, player?: IPlayer) => {
+    const req = method == CreateUserMethod.Discord ?
+        beatleader.player.discord[id] :
+        beatleader.player[id];
+    
+    player ??= await req.get_json().catch(() => undefined);
     if (!player) return null;
 
     let user = await User.findOne({ where: { beatleader: player.id } });
-    if (!user) user = await User.create({ discord, beatleader: player.id });
     
-    if (update) {
-        user.name = player.name;
-        user.country = player.country;
-        user.avatar = player.avatar;
-        user.clans = player.clans.map(c => c.tag).join(",");
-
-        await user.save();
+    const discord = player.socials?.find(s => s.service == "Discord");
+    
+    if (user && !user.discord && (discord || method == CreateUserMethod.Discord)) {
+        user.discord = (method == CreateUserMethod.Discord ? id : discord?.userId) as string;
+    } else {
+        user = await User.create({
+            discord: method == CreateUserMethod.Discord ? id : null,
+            beatleader: player.id
+        });
     }
+
+    await user.refresh();
     
     return user;
 }

@@ -5,7 +5,7 @@ import { beatleader } from "../api";
 import { EmbedBuilder } from "@discordjs/builders";
 import { trim } from "../utils/utils";
 import { linkDiscordMessage } from "./clan";
-import { createUser } from "../database/models/User";
+import { CreateUserMethod, createUser } from "../database/models/User";
 
 export class RefreshMeCommand extends Command {
     constructor() {
@@ -15,8 +15,8 @@ export class RefreshMeCommand extends Command {
             options: [
                 {
                     type: ChatInteractionOptionType.BOOLEAN,
-                    name: "force",
-                    description: "Force a refresh of your profile.",
+                    name: "full",
+                    description: "Sync all scores from your profile.",
                     required: false
                 }
             ]
@@ -25,8 +25,10 @@ export class RefreshMeCommand extends Command {
 
     async execute(interaction: ChatInputCommandInteraction<CacheType>): Promise<void> {
         let user = await User.findOne({ where: { discord: interaction.user.id } });
+        let isNewUser = false;
         if (!user) {
-            user = await createUser(interaction.user.id, undefined, true);
+            user = await createUser(CreateUserMethod.Discord, interaction.user.id);
+            isNewUser = true;
             
             if (!user) {
                 await interaction.reply({
@@ -43,7 +45,8 @@ export class RefreshMeCommand extends Command {
             ephemeral: true
         });
 
-        await user.refresh(true, !!interaction.options.getBoolean("force"));
+        const force = !!interaction.options.getBoolean("force");
+        await user.refresh(true, force, !isNewUser);
 
         await resp.edit("Synced your profile!");
     }
@@ -68,7 +71,7 @@ export class ProfileCommand extends Command {
         await interaction.deferReply({ ephemeral: true });
         const option = interaction.options.getUser("user", false);
         const discord = (option ?? interaction.user).id;
-        const user = await createUser(discord, undefined, true);
+        const user = await createUser(CreateUserMethod.Discord, discord);
 
         if (!user) {
             await interaction.editReply({

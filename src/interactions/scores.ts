@@ -17,7 +17,7 @@ import { IScore } from "../types/beatleader";
 import PlaylistUtils from "../utils/PlaylistUtils";
 import { Query, _Difficulty, _Leaderboard, _Score, _Song, _User } from "../database/manual";
 import Clan from "../database/models/Clan";
-import { createUser } from "../database/models/User.js";
+import { CreateUserMethod, createUser } from "../database/models/User.js";
 import { linkDiscordMessage } from "./clan.js";
 
 const logger = new Logger("Live-Scores");
@@ -145,7 +145,7 @@ export class ShareScoresCommand extends Command {
         try { await int.deleteReply() } catch { }
 
         const discord = (interaction.options.getUser("user", false) ?? interaction.user).id;
-        const user = await createUser(discord, undefined, true);
+        const user = await createUser(CreateUserMethod.Discord, discord, undefined);
     
         if (!user) {
             await interaction.reply({
@@ -758,7 +758,7 @@ export class PlaylistCommand extends Command {
     async userScores(interaction: ChatInputCommandInteraction) {
         const option = interaction.options.getUser("user", false);
         const discord = (option ?? interaction.user).id;
-        const user = await createUser(discord, undefined, true);
+        const user = await createUser(CreateUserMethod.Discord, discord);
 
         if (!user) {
             await interaction.reply({
