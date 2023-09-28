@@ -37,6 +37,7 @@ export default class Clan extends Model {
     }
 
     async refresh() {
+        logger.info(`Refreshing clan ${this.tag} with ${this.memberCount} members.`);
         const members = await this.fetchMembers();
 
         this.memberCount = members.length;
