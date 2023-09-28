@@ -2,6 +2,8 @@
 
 Unofficial BeatLeader Discord bot integration
 
+[Invite here!](https://discord.com/api/oauth2/authorize?client_id=1156310849439400047&scope=bot)
+
 ## Features
 
 - Clan Live Scores
