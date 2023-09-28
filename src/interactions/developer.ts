@@ -7,7 +7,6 @@ import ModifierValues, { createModifierValues } from "../database/models/Leaderb
 
 export const evaluate = MessageCommand("eval", async (client, message, args) => {
     if (message.author.id != ownerId) return;
-    client.guilds.cache
     
     // evaluation variables
     const models = require("../database/index");
