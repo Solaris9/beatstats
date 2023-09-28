@@ -68,9 +68,9 @@ export const leaderboardFunction = async (client: Client) => {
             }
 
             const file = await drawLeaderboard(leaderboard, name, users, nameCache);
-            
             const existing = messages.find(m => m.attachments.find(f => f.name.includes(leaderboard)));
-            if (existing) existing.edit({ files: [file] });
+
+            if (existing) await existing.edit({ files: [file] });
             else await channel.send({ files: [file] });
         }
     }

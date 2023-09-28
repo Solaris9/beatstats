@@ -1,11 +1,12 @@
 // @ts-ignore
 import { CacheType, ChatInputCommandInteraction, Client, EmbedBuilder, GuildTextBasedChannel} from "discord.js";
-import { ChatInteractionOptionType, Command } from "../framework";
+import { ChatInteractionOptionChoice, ChatInteractionOptionType, Command } from "../framework";
 import { User } from "../database";
 import { Logger } from "../utils/logger";
 import Clan from "../database/models/Clan";
 import { Op } from "sequelize";
 import { CreateUserMethod, createUser } from "../database/models/User";
+import { leaderboardFunction } from "./leaderboards";
 
 export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
 
@@ -20,7 +21,9 @@ const channelTypes = [
         name: "Leaderboards",
         value: "leaderboardsChannel"
     }
-];
+] as const;
+
+type ChannelTypes = typeof channelTypes[number]["value"]
 
 export class ClanCommands extends Command {
     constructor() {
@@ -53,7 +56,7 @@ export class ClanCommands extends Command {
                             name: "type",
                             description: "The type of channel to configure.",
                             required: true,
-                            choices: channelTypes
+                            choices: channelTypes as unknown as ChatInteractionOptionChoice[]
                         },
                         {
                             type: ChatInteractionOptionType.CHANNEL,
@@ -189,12 +192,17 @@ export class ClanCommands extends Command {
         const user = await this._checkClan(interaction);
         if (!user) return;
 
-        const type = interaction.options.getString("type", true);
+        const type = interaction.options.getString("type", true) as ChannelTypes;
         const { name } = channelTypes.find(t => t.value == type)!;
 
         const channel = interaction.options.getChannel("channel", false);
+        const setChannel = channel?.id ?? null;
 
-        clan[type] = channel?.id ?? null;
+        if (type == "leaderboardsChannel" && clan[type] != setChannel) {
+            setTimeout(() => leaderboardFunction(interaction.client));
+        }
+
+        clan[type] = setChannel;
         await clan.save();
 
         await interaction.reply({

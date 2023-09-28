@@ -156,7 +156,7 @@ export const createUser = async (method: CreateUserMethod, id: string, player?: 
     
     if (user && !user.discord && (discord || method == CreateUserMethod.Discord)) {
         user.discord = (method == CreateUserMethod.Discord ? id : discord?.userId) as string;
-    } else {
+    } else if (!user) {
         user = await User.create({
             discord: method == CreateUserMethod.Discord ? id : null,
             beatleader: player.id
