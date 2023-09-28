@@ -10,10 +10,11 @@ import load from "./framework.js";
 import cron from "node-cron";
 
 // @ts-ignore
-import { TOKEN, PREFIX, solarisId } from "../config.json";
+import { TOKEN, PREFIX, ownerId } from "../config.json";
+import { exists } from "./utils/utils.js";
 
 export const logger = new Logger("Bot");
-logger.info("Starting...")
+logger.info("Starting...");
 
 cron.schedule("0 0 * * *", async () => {
     const dir = join(process.cwd(), "cards");
@@ -83,7 +84,7 @@ if (interactions.size) {
             if (interaction.isChatInputCommand()) {
                 const command = interactions.get(interaction.commandName);
                 if (command) {
-                    if (command.config?.dev && interaction.user.id != solarisId) {
+                    if (command.config?.dev && interaction.user.id != ownerId) {
                         await interaction.reply({
                             ephemeral: true,
                             content: "You do not have permission to run this command."
@@ -145,7 +146,12 @@ if (commands.size) {
 
 sequelize.sync()
     .then(() => client.login(TOKEN))
-    .then(() => logger.info("Ready"));
+    .then(async () => {
+        const cardsDir = join(process.cwd(), "cards");
+        if (!await exists(cardsDir)) await mkdir(cardsDir);
+        
+        logger.info("Ready");
+    });
 
 process.on("unhandledRejection", logger.error.bind(null));
 process.on("uncaughtException", logger.error.bind(null));

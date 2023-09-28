@@ -294,7 +294,7 @@ export class ClanCommands extends Command {
 // }
 
 // export const showWelcomeMessage = MessageCommand(async (client, message, args) => {
-//     if (message.author.id !== solarisId) return;
+//     if (message.author.id !== ownerId) return;
 //     if (message.guild?.id != guildId) return;
 
 

@@ -1,3 +1,5 @@
+import { lstat } from "fs/promises";
+
 export const store = <T>() => {
     let value: T;
 
@@ -45,4 +47,13 @@ export function timeAgo(time: number) {
     }
 
     return intl.format(-Math.floor(value), format);
+}
+
+export const exists = async (dir: string) => {
+    try {
+        await lstat(dir);
+        return true;
+    } catch {
+        return false;
+    }
 }

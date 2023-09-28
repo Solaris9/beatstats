@@ -1,12 +1,12 @@
 import { MessageCommand } from "../framework";
-import { PREFIX, solarisId } from "../../config.json";
+import { PREFIX, ownerId } from "../../config.json";
 import { beatleader } from "../api";
 import { Leaderboard, createLeaderboard, createSong, createSongDifficulty } from "../database";
 import ModifierRatings, { createModifierRating } from "../database/models/LeaderboardModifierRatings";
 import ModifierValues, { createModifierValues } from "../database/models/LeaderboardModifierValues";
 
 export const evaluate = MessageCommand("eval", async (client, message, args) => {
-    if (message.author.id != solarisId) return;
+    if (message.author.id != ownerId) return;
     client.guilds.cache
     
     // evaluation variables
@@ -24,7 +24,7 @@ export const evaluate = MessageCommand("eval", async (client, message, args) => 
 });
 
 export const refreshLeaderboards = MessageCommand("refreshLeaderboards", async (client, message, args) => {
-    if (message.author.id != solarisId) return;
+    if (message.author.id != ownerId) return;
 
     if (args[0]) {
         const leaderboard = await beatleader.leaderboard[args[0]].get_json();
