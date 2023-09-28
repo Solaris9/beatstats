@@ -1,4 +1,4 @@
-import { Client, ChatInputCommandInteraction, Message, Collection, Interaction, StringSelectMenuInteraction, StringSelectMenuBuilder, ButtonInteraction, ButtonBuilder } from "discord.js";
+import { Client, ChatInputCommandInteraction, Message, Collection, Interaction, StringSelectMenuInteraction, StringSelectMenuBuilder, ButtonInteraction, ButtonBuilder, PermissionsBitField } from "discord.js";
 import { glob } from "glob";
 import { Logger } from "./utils/logger.js";
 
@@ -49,7 +49,10 @@ export type ChatInteractionOptions = {
 export class Command {
     constructor(
         public options: ChatInteractionOptions,
-        public config?: { dev: boolean }
+        public config?: {
+            dev?: boolean,
+            permissions?: bigint[]
+        }
     ) { }
     
     async test?(interaction: Interaction): Promise<void>;

@@ -11,7 +11,7 @@ import cron from "node-cron";
 
 // @ts-ignore
 import { TOKEN, PREFIX, ownerId } from "../config.json";
-import { exists } from "./utils/utils.js";
+import { checkPermission, exists } from "./utils/utils.js";
 
 export const logger = new Logger("Bot");
 logger.info("Starting...");
@@ -84,6 +84,19 @@ if (interactions.size) {
             if (interaction.isChatInputCommand()) {
                 const command = interactions.get(interaction.commandName);
                 if (command) {
+                    if (command.config?.permissions) {
+                        const missing = await checkPermission(command.config.permissions, interaction);
+                        
+                        if (missing) {
+                            await interaction.reply({
+                                ephemeral: true,
+                                content: missing
+                            });
+
+                            return;
+                        }
+                    }
+
                     if (command.config?.dev && interaction.user.id != ownerId) {
                         await interaction.reply({
                             ephemeral: true,

@@ -1,3 +1,4 @@
+import { ChatInputCommandInteraction, GuildTextBasedChannel, PermissionFlagsBits } from "discord.js";
 import { lstat } from "fs/promises";
 
 export const store = <T>() => {
@@ -55,5 +56,30 @@ export const exists = async (dir: string) => {
         return true;
     } catch {
         return false;
+    }
+}
+
+const permissionMessages = new Map([
+    [PermissionFlagsBits.SendMessages, "I am missing `Send Messages` in this channel."],
+    [PermissionFlagsBits.SendMessagesInThreads, "I am missing `Send Messages` in this thread."],
+    [PermissionFlagsBits.AttachFiles, "I am missing `Attach Files` in this channel."],
+    [PermissionFlagsBits.ViewChannel, "I am missing `View Channel` permission in this channel."]
+]);
+
+export async function checkPermission(permissions: bigint[], interaction: ChatInputCommandInteraction);
+export async function checkPermission(permissions: bigint[], channel: GuildTextBasedChannel);
+export async function checkPermission(permissions: bigint[], interactionOrChannel: ChatInputCommandInteraction | GuildTextBasedChannel) {
+    let channel: GuildTextBasedChannel;
+    
+    if (interactionOrChannel instanceof ChatInputCommandInteraction) {
+        channel = await interactionOrChannel.client.channels.fetch(interactionOrChannel.channelId) as GuildTextBasedChannel;
+    } else {
+        channel = interactionOrChannel;
+    }
+    
+    const perms = channel!.permissionsFor(channel.guild.members.me!);
+
+    for (let permission of permissions) {
+        if (!perms.has(permission)) return permissionMessages.get(permission);
     }
 }

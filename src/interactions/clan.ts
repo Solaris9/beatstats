@@ -1,5 +1,5 @@
 // @ts-ignore
-import { CacheType, ChatInputCommandInteraction, Client, EmbedBuilder, GuildTextBasedChannel} from "discord.js";
+import { CacheType, ChatInputCommandInteraction, Client, EmbedBuilder, GuildTextBasedChannel, PermissionFlagsBits} from "discord.js";
 import { ChatInteractionOptionChoice, ChatInteractionOptionType, Command } from "../framework";
 import { User } from "../database";
 import { Logger } from "../utils/logger";
@@ -7,6 +7,7 @@ import Clan from "../database/models/Clan";
 import { Op } from "sequelize";
 import { CreateUserMethod, createUser } from "../database/models/User";
 import { leaderboardFunction } from "./leaderboards";
+import { checkPermission } from "../utils/utils";
 
 export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
 
@@ -195,7 +196,22 @@ export class ClanCommands extends Command {
         const type = interaction.options.getString("type", true) as ChannelTypes;
         const { name } = channelTypes.find(t => t.value == type)!;
 
-        const channel = interaction.options.getChannel("channel", false);
+        const channel = interaction.options.getChannel("channel", false) as GuildTextBasedChannel;
+
+        const missing = await checkPermission([
+            PermissionFlagsBits.SendMessages,
+            PermissionFlagsBits.SendMessagesInThreads,
+            PermissionFlagsBits.AttachFiles,
+        ], channel);
+
+        if (missing) {
+            await interaction.reply({
+                ephemeral: true,
+                content: missing
+            })
+            return;
+        }
+
         const setChannel = channel?.id ?? null;
 
         if (type == "leaderboardsChannel" && clan[type] != setChannel) {

@@ -1,4 +1,4 @@
-import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Message, EmbedBuilder, Guild } from "discord.js";
+import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits } from "discord.js";
 import { ChatInteractionOptionType, Command } from "../framework.js";
 import { WebSocket } from "ws";
 import { ScoreImprovement, User, sequelize } from "../database";
@@ -10,7 +10,7 @@ import ModifierValues, { createModifierValues, getModifier } from "../database/m
 import ModifierRatings, { createModifierRating } from "../database/models/LeaderboardModifierRatings.js";
 import Score, { createScore } from "../database/models/Score.js";
 import { Op, QueryTypes, WhereOptions } from "sequelize";
-import { timeAgo } from "../utils/utils.js";
+import { checkPermission, timeAgo } from "../utils/utils.js";
 import { Logger } from "../utils/logger.js";
 import { beatleader } from "../api";
 import { IScore } from "../types/beatleader";
@@ -67,7 +67,15 @@ export const onceReady = async (client: Client) => {
                     }
         
                     const channel = await guild.channels.fetch(clan.liveScoresChannel!) as GuildTextBasedChannel;
-                    if (!channel) {
+
+                    const missing = await checkPermission([
+                        PermissionFlagsBits.SendMessages,
+                        PermissionFlagsBits.SendMessagesInThreads,
+                        PermissionFlagsBits.AttachFiles,
+                        PermissionFlagsBits.ViewChannel
+                    ], channel);
+
+                    if (!channel || missing) {
                         clan.liveScoresChannel = null
                         await clan.save();
                         continue;
@@ -131,7 +139,14 @@ export class ShareScoresCommand extends Command {
                     ]
                 }
             ]
-        })
+        }, {
+            permissions: [
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.SendMessagesInThreads,
+                PermissionFlagsBits.AttachFiles,
+                PermissionFlagsBits.ViewChannel
+            ]
+        });
     }
 
     #scores = {} as Record<string, IScore[]>;
@@ -553,6 +568,13 @@ export class PlaylistCommand extends Command {
                         }
                     ]
                 }
+            ]
+        }, {
+            permissions: [
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.SendMessagesInThreads,
+                PermissionFlagsBits.AttachFiles,
+                PermissionFlagsBits.ViewChannel
             ]
         });
     }

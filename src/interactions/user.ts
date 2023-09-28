@@ -1,4 +1,4 @@
-import { CacheType, ChatInputCommandInteraction } from "discord.js";
+import { CacheType, ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
 import { ChatInteractionOptionType, Command } from "../framework";
 import { Leaderboard, Score, User } from "../database";
 import { beatleader } from "../api";
@@ -63,6 +63,14 @@ export class ProfileCommand extends Command {
                     name: "user",
                     description: "A user to view their profile."
                 }
+            ]
+        },
+        {
+            permissions: [
+                PermissionFlagsBits.SendMessages,
+                PermissionFlagsBits.SendMessagesInThreads,
+                PermissionFlagsBits.AttachFiles,
+                PermissionFlagsBits.ViewChannel
             ]
         });
     }
