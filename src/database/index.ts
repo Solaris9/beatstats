@@ -10,8 +10,10 @@ import SongDifficulty, { createSongDifficulty } from "./models/SongDifficulty.js
 import Song, { createSong } from "./models/Song.js";
 import User from "./models/User.js";
 import Clan from "./models/Clan.js";
+import Stats from "./models/Stats.js";
 
 export {
+    Stats,
     Clan,
     User,
     Song,
@@ -68,6 +70,7 @@ export const sequelize = new Sequelize({
     username: 'root',
     password: '',
     models: [
+        Stats,
         Clan,
         User,
         Score,

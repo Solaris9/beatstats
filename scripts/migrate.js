@@ -8,4 +8,8 @@ const query = sequelize.getQueryInterface();
 // query.addColumn("Users", "clans", DataType.STRING);
 
 // query.addColumn("Clans", "leaderboardsChannel", DataType.STRING);
-query.addColumn("Clans", "memberCount", DataType.NUMBER);
+// query.addColumn("Clans", "memberCount", DataType.NUMBER);
+query.addColumn("Stats", "live_scores", {
+    defaultValue: 0,
+    type: DataType.NUMBER
+});

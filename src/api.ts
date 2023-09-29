@@ -1,3 +1,5 @@
+import { Op, Sequelize } from "sequelize";
+import Stats from "./database/models/Stats";
 import { IClanContainer, ILeaderboard, IPlayer, IResultPagination, IScore } from "./types/beatleader";
 import { Logger } from "./utils/logger";
 
@@ -41,6 +43,8 @@ const create = <T>(url: string): T => {
 
                 if (res.status >= 400) return await Promise.reject(res.status);
 
+                await Stats.increment(["beatleader_requests"], { by: 1, where: { id: 0 } });
+
                 return p.endsWith("json") ? await res.json() : res;
             }
 
@@ -67,23 +71,3 @@ type BeatLeaderAPI = {
 }
  
 export const beatleader = create<BeatLeaderAPI>("https://api.beatleader.xyz");
-
-type TwitchAPI = APIRequest<{
-    data: {
-        user: {
-            displayName: string;
-            primaryColorHex: string;
-            profileImageURL: string;
-            profileURL: string;
-            stream: null | {
-                previewImageURL: string;
-                createdAt: string;
-                game: {
-                    name: string;
-                };
-            }
-        }
-    }
-}>;
-
-export const twitch = create<TwitchAPI>("https://gql.twitch.tv/gql");

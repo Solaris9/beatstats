@@ -1,7 +1,7 @@
 import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits } from "discord.js";
 import { ChatInteractionOptionType, Command } from "../framework.js";
 import { WebSocket } from "ws";
-import { ScoreImprovement, User, sequelize } from "../database";
+import { ScoreImprovement, Stats, User, sequelize } from "../database";
 import { drawCard } from "../drawing/scores/index";
 import Song, { createSong } from "../database/models/Song.js";
 import Leaderboard, { LeaderboardType, createLeaderboard } from "../database/models/Leaderboard.js";
@@ -58,6 +58,7 @@ export const onceReady = async (client: Client) => {
                 }});
 
                 for (let clan of clans) {
+
                     const guild = await client.guilds.fetch(clan.guild!) as Guild;
                     if (!guild) {
                         clan.guild = null
@@ -80,6 +81,8 @@ export const onceReady = async (client: Client) => {
                         await clan.save();
                         continue;
                     }
+                    
+                    await Stats.increment(["live_scores"], { by: 1, where: { id: 0 } });
 
                     await sendScoreCard([score.scoreId], channel, true);
                 }

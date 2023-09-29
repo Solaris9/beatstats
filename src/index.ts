@@ -12,6 +12,7 @@ import cron from "node-cron";
 // @ts-ignore
 import { TOKEN, PREFIX, ownerId } from "../config.json";
 import { checkPermission, exists } from "./utils/utils.js";
+import Stats from "./database/models/Stats.js";
 
 export const logger = new Logger("Bot");
 logger.info("Starting...");
@@ -155,14 +156,17 @@ if (commands.size) {
     });
 }
 
+// bot initialization
 sequelize.sync()
-    .then(() => client.login(TOKEN))
     .then(async () => {
         const cardsDir = join(process.cwd(), "cards");
         if (!await exists(cardsDir)) await mkdir(cardsDir);
-        
-        logger.info("Ready");
-    });
+
+        const stats = await Stats.findOne();
+        if (!stats) await Stats.create({ id: 0 });
+    })
+    .then(() => client.login(TOKEN))
+    .then(() => logger.info("Ready"));
 
 process.on("unhandledRejection", logger.error.bind(null));
 process.on("uncaughtException", logger.error.bind(null));
