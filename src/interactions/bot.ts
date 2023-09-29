@@ -47,7 +47,9 @@ export class BotCommand extends Command {
             "BeatLeader Requests": stats.beatleader_requests,
             "Live Scores Set": stats.live_scores,
             "Cached Scores": cachedScores,
-            "Cached Users": cachedUsers
+            "Cached Users": cachedUsers,
+            "Bot Users": interaction.client.users.cache.size,
+            "Bot Guilds": interaction.client.guilds.cache.size,
         };
 
         const content = Object.entries(parts)
