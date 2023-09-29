@@ -79,14 +79,18 @@ export class ProfileCommand extends Command {
         await interaction.deferReply({ ephemeral: true });
         const option = interaction.options.getUser("user", false);
         const discord = (option ?? interaction.user).id;
-        const user = await createUser(CreateUserMethod.Discord, discord);
 
+        let user = await User.findOne({ where: { discord } });
         if (!user) {
-            await interaction.editReply({
-                content: linkDiscordMessage,
-            });
-            
-            return;
+            user = await createUser(CreateUserMethod.Discord, discord);
+
+            if (!user) {
+                await interaction.editReply({
+                    content: linkDiscordMessage,
+                });
+
+                return;
+            }
         }
 
         await interaction.editReply("Loading...");

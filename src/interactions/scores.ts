@@ -163,14 +163,19 @@ export class ShareScoresCommand extends Command {
         try { await int.deleteReply() } catch { }
 
         const discord = (interaction.options.getUser("user", false) ?? interaction.user).id;
-        const user = await createUser(CreateUserMethod.Discord, discord, undefined);
-    
+        let user = await User.findOne({ where: { discord } });
+        
         if (!user) {
-            await interaction.reply({
-                content: "You aren't linked to a BeatLeader profile. Please run /refresh",
-                ephemeral: true
-            });
-            return;
+            user = await createUser(CreateUserMethod.Discord, discord);
+
+            if (!user) {
+                await interaction.reply({
+                    content: linkDiscordMessage,
+                    ephemeral: true
+                });
+
+                return;
+            }
         }
     
         const sortBy = sub == "recent" ? "date" : "pp";
@@ -783,15 +788,20 @@ export class PlaylistCommand extends Command {
     async userScores(interaction: ChatInputCommandInteraction) {
         const option = interaction.options.getUser("user", false);
         const discord = (option ?? interaction.user).id;
-        const user = await createUser(CreateUserMethod.Discord, discord);
 
+        let user = await User.findOne({ where: { discord } });
         if (!user) {
-            await interaction.reply({
-                content: linkDiscordMessage,
-                ephemeral: true,
-            });
-            
-            return;
+            user = await createUser(CreateUserMethod.Discord, discord);
+
+            if (!user) {
+                await interaction.reply({
+                    content: linkDiscordMessage,
+                    ephemeral: true,
+                });
+                
+
+                return;
+            }
         }
 
         await interaction.deferReply();

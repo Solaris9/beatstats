@@ -113,18 +113,22 @@ export class ClanCommands extends Command {
 
     async setup(interaction: ChatInputCommandInteraction) {        
         const discord = interaction.user.id;
-        const user = await createUser(CreateUserMethod.Discord, discord);
-        
-        if (!user) {
-            await interaction.reply({
-                ephemeral: true,
-                content: linkDiscordMessage
-            });
 
-            return;
+        let user = await User.findOne({ where: { discord } });
+        if (!user) {
+            user = await createUser(CreateUserMethod.Discord, discord);
+            
+            if (!user) {
+                await interaction.reply({
+                    ephemeral: true,
+                    content: linkDiscordMessage
+                });
+
+                return;
+            }
         }
 
-        if (user.discord != interaction.guild?.ownerId) {
+        if (discord != interaction.guild?.ownerId) {
             await interaction.reply({
                 content: "This command requires the guild's owner to run it.",
                 ephemeral: true
@@ -190,7 +194,7 @@ export class ClanCommands extends Command {
         const clan = await this._checkClan(interaction)
         if (!clan) return;
 
-        const user = await this._checkClan(interaction);
+        const user = await this._checkOwner(clan, interaction);
         if (!user) return;
 
         const type = interaction.options.getString("type", true) as ChannelTypes;
