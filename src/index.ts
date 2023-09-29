@@ -50,16 +50,14 @@ const path = join(process.cwd(), "assets", "fonts");
 // registerFont(join(path, "NotoSans-Regular.ttf"), { family: "NotoSans" });
 registerFont(join(path, "SF-Compact-Text-Regular.ttf"), { family: "SF-Compact" });
 
-const intents = [
-    IntentsBitField.Flags.Guilds,
-    IntentsBitField.Flags.GuildMessages,
-    IntentsBitField.Flags.GuildMembers,
-    IntentsBitField.Flags.MessageContent,
-    IntentsBitField.Flags.GuildVoiceStates
-];
-
 const client = new Client({
-    intents,
+    intents: [
+        IntentsBitField.Flags.Guilds,
+        IntentsBitField.Flags.GuildMessages,
+        IntentsBitField.Flags.GuildMembers,
+        IntentsBitField.Flags.MessageContent,
+        IntentsBitField.Flags.GuildVoiceStates
+    ],
     partials: [
         Partials.Channel,
         Partials.Reaction,

@@ -198,9 +198,9 @@ export class ShareScoresCommand extends Command {
                 const difference = 96 - difficultyText.length;
                 songText = songText.slice(0, difference) + "...";
             }
-                        
+
             return new StringSelectMenuOptionBuilder({
-                label: `${songText} [${difficultyText}]`,
+                label: `${songText} ${difficultyText}`,
                 value: score.id.toString(),
                 description
             });
