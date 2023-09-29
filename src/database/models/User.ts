@@ -161,9 +161,9 @@ export const createUser = async (method: CreateUserMethod, id: string, player?: 
             discord: method == CreateUserMethod.Discord ? id : null,
             beatleader: player.id
         });
-    }
 
-    await user.refresh();
+        await user.refresh();
+    }
     
     return user;
 }
