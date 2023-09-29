@@ -43,12 +43,15 @@ export class BotCommand extends Command {
         const cachedScores = await Score.count();
         const cachedUsers = await User.count();
 
+        const botUsers = interaction.client.guilds.cache
+            .reduce((a, c) => a + c.memberCount, 0);
+
         const parts = {
             "BeatLeader Requests": stats.beatleader_requests,
             "Live Scores Set": stats.live_scores,
             "Cached Scores": cachedScores,
             "Cached Users": cachedUsers,
-            "Bot Users": interaction.client.users.cache.size,
+            "Bot Users": botUsers,
             "Bot Guilds": interaction.client.guilds.cache.size,
         };
 
