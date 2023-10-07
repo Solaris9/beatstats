@@ -1,11 +1,11 @@
-import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits } from "discord.js";
+import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable } from "discord.js";
 import { ChatInteractionOptionType, Command } from "../framework.js";
 import { WebSocket } from "ws";
 import { ScoreImprovement, Stats, User, sequelize } from "../database";
 import { drawCard } from "../drawing/scores/index";
 import Song, { createSong } from "../database/models/Song.js";
 import Leaderboard, { LeaderboardType, createLeaderboard } from "../database/models/Leaderboard.js";
-import Difficulty, { createSongDifficulty, getDifficultyName } from "../database/models/SongDifficulty.js";
+import Difficulty, { createSongDifficulty, getDifficultyName, getModeName } from "../database/models/SongDifficulty.js";
 import ModifierValues, { createModifierValues, getModifier } from "../database/models/LeaderboardModifierValues.js";
 import ModifierRatings, { createModifierRating } from "../database/models/LeaderboardModifierRatings.js";
 import Score, { createScore } from "../database/models/Score.js";
@@ -84,7 +84,7 @@ export const onceReady = async (client: Client) => {
                     
                     await Stats.increment(["live_scores"], { by: 1, where: { id: 0 } });
 
-                    await sendScoreCard([score.scoreId], channel, true);
+                    await sendScoreCard([score.scoreId], channel, { isLive: true });
                 }
             }
         });
@@ -145,7 +145,6 @@ export class ShareScoresCommand extends Command {
         }, {
             permissions: [
                 PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.SendMessagesInThreads,
                 PermissionFlagsBits.AttachFiles,
                 PermissionFlagsBits.ViewChannel
             ]
@@ -363,11 +362,16 @@ export class ShareScoresCommand extends Command {
         const int = this.#interactions[interaction.user.id];
         try { await int.deleteReply() } catch { }
 
-        await sendScoreCard(ids, interaction.channel as GuildTextBasedChannel, false);
+        await sendScoreCard(ids, interaction.channel as GuildTextBasedChannel, { isLive: false } );
     }
 }
 
-async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel, isLive?: boolean) {
+type SendScoreOptions = Partial<{
+    isLive: boolean;
+    reply: MessageResolvable
+}>;
+
+async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel, options?: SendScoreOptions) {
     const scores = await Score.findAll({
         where: {
             scoreId: { [Op.in]: scoreIds }
@@ -413,9 +417,13 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
             .setLabel("Leaderboard")
             .setStyle(ButtonStyle.Link)
             .setURL(`http://beatleader.xyz/leaderboard/global/${score.leaderboardId}`)
+        const compareButton = new ButtonBuilder()
+            .setCustomId(`compare-${score.leaderboardId}-${user.beatleader}`)
+            .setLabel("Compare")
+            .setStyle(ButtonStyle.Primary)
 
         const row = new ActionRowBuilder({ components: [
-            replayButton, playerButton, leaderboardButton
+            replayButton, playerButton, leaderboardButton, compareButton
         ]});
         
         const file = await drawCard("minimal", score);
@@ -427,12 +435,13 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
         const inGuild = user.discord ? await channel.guild.members.fetch(user.discord).catch(() => null) : null;
         const prefix = inGuild ? `<@${score.user.discord}>` : score.user.name;
 
-        const content = isLive ?
+        const content = options?.isLive ?
             `${prefix} set a new ${difficulty} score on ${song} <t:${timeSet}:R>!` :
             `${prefix}'s ${difficulty} score on ${song} set <t:${timeSet}:R>!`;
     
         await channel.send({
             content,
+            reply: options?.reply ? { messageReference: options.reply } : undefined,
             files: [file],
             // @ts-ignore    
             components: [row],
@@ -440,6 +449,97 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
                 users: [],
                 roles: []
             }
+        });
+    }
+}
+
+export const onInteractionCreate = async (client: Client, interaction: Interaction) => {
+    if (interaction.isButton() && interaction.customId.startsWith("compare")) {
+        const discord = interaction.user.id;
+        const leaderboardId = interaction.customId.split("-")[1];
+        const compareBeatleader = interaction.customId.split("-")[2];
+
+        const user = await createUser(CreateUserMethod.Discord, discord);
+
+        if (!user) {
+            await interaction.reply({
+                ephemeral: true,
+                content: linkDiscordMessage
+            });
+
+            return;
+        }
+
+        let id: number;
+
+        const score = await Score.findOne({
+            where: {
+                playerId: user.beatleader,
+                leaderboardId
+            }
+        });
+
+        console.log(score);
+
+        if (score) {
+            if (score.playerId == compareBeatleader) {
+                await interaction.reply({
+                    ephemeral: true,
+                    content: "Sorry, you can't compare against your own score."
+                });
+
+                return;
+            }
+
+            id = score.scoreId
+        } else {
+            const dbLeaderboard = await Leaderboard.findOne({
+                where: { leaderboardId },
+                include: [
+                    {
+                        model: Difficulty,
+                        include: [Song]
+                    }
+                ]
+            });
+
+            const hash = dbLeaderboard!.difficulty.song.hash;
+            const difficulty = getDifficultyName(dbLeaderboard!.difficulty.difficulty, true);
+            const mode = getModeName(dbLeaderboard!.difficulty.mode);
+    
+            let score = await beatleader.score[user.beatleader][hash][difficulty][mode]
+            .get_json().catch(() => null);
+
+            if (!score) {
+                await interaction.reply({
+                    ephemeral: true,
+                    content: "You do not have a score on this leaderboard."
+                });
+
+                return;
+            }
+
+            score = await beatleader.score[score.id].get_json();
+            const leaderboard = await beatleader.leaderboard[score.leaderboardId].get_json();
+
+            await createSong(leaderboard.song);
+            await createLeaderboard(leaderboard);
+            await createSongDifficulty(leaderboard);
+            await createModifierValues(leaderboardId, leaderboard.difficulty);
+            await createModifierRating(leaderboardId, leaderboard.difficulty);
+            await createScore(score);
+
+            id = score.id
+        }
+
+        await interaction.reply({
+            ephemeral: true,
+            content: `Comparing score...`,
+        });
+
+
+        await sendScoreCard([id], interaction.channel as GuildTextBasedChannel, {
+            reply: interaction.message
         });
     }
 }

@@ -5,7 +5,7 @@ import { Logger } from "./utils/logger";
 
 const logger = new Logger("HTTP")
 
-type Dynamic<O, V> = { [k: string]: (O extends false ? {} : APIRequest<O>) & V}
+type Dynamic<O, V = {}> = { [k: string]: (O extends false ? {} : APIRequest<O>) & V}
 
 type RequestData = Omit<RequestInit, "method"> & { query?: NodeJS.Dict<unknown> }
 
@@ -63,6 +63,7 @@ type BeatLeaderAPI = {
         identity: APIRequest<{ id: string }>;
         token: APIRequest<{ access_token: string }>;
     };
+    score: Dynamic<IScore, Dynamic<false, Dynamic<false, Dynamic<IScore>>>>;
     clan: {
         invite: APIRequest;
     } & Dynamic<false, APIRequest<IResultPagination<IPlayer, { container: IClanContainer }>>>;
