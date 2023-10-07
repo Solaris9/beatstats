@@ -423,8 +423,11 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
             .setStyle(ButtonStyle.Primary)
 
         const row = new ActionRowBuilder({ components: [
-            replayButton, playerButton, leaderboardButton, compareButton
-        ]});
+            replayButton, playerButton, leaderboardButton
+        ]
+        });
+        
+        if (!options?.isLive) row.addComponents(compareButton);
         
         const file = await drawCard("minimal", score);
 
