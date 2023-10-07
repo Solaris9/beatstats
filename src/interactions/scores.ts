@@ -479,8 +479,6 @@ export const onInteractionCreate = async (client: Client, interaction: Interacti
             }
         });
 
-        console.log(score);
-
         if (score) {
             if (score.playerId == compareBeatleader) {
                 await interaction.reply({
