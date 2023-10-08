@@ -9,7 +9,7 @@ import Difficulty, { createSongDifficulty, getDifficultyName, getModeName } from
 import ModifierValues, { createModifierValues, getModifier } from "../database/models/LeaderboardModifierValues.js";
 import ModifierRatings, { createModifierRating } from "../database/models/LeaderboardModifierRatings.js";
 import Score, { createScore } from "../database/models/Score.js";
-import { Op, QueryTypes, WhereOptions } from "sequelize";
+import { Includeable, Op, QueryTypes, WhereOptions } from "sequelize";
 import { checkPermission, timeAgo } from "../utils/utils.js";
 import { Logger } from "../utils/logger.js";
 import { beatleader } from "../api";
@@ -615,6 +615,12 @@ export class PlaylistCommand extends Command {
                     description: "Generate a playlist of maps for potential scores.",
                     options: [
                         {
+                            type: ChatInteractionOptionType.BOOLEAN,
+                            name: "all",
+                            description: "Whether to use all leaderboards",
+                            required: true
+                        },
+                        {
                             type: ChatInteractionOptionType.DOUBLE,
                             name: "pp",
                             description: "The PP target to achieve",
@@ -747,6 +753,7 @@ export class PlaylistCommand extends Command {
         await interaction.deferReply();
         const user = await User.findOne({ where: { discord: interaction.user.id } });
 
+        const all = interaction.options.getBoolean("all", true);
         const pp = interaction.options.getNumber("pp", true);
 
         const minAcc = interaction.options.getNumber("min-acc", false);
@@ -776,22 +783,32 @@ export class PlaylistCommand extends Command {
         if (nb) mods.push("NB");
         if (no) mods.push("NO");
 
+        const include: Includeable[] = [
+            {
+                model: Difficulty,
+                include: [Song]
+            },
+            {
+                model: ModifierValues,
+                as: "modifierValues"
+            },
+            {
+                model: ModifierRatings,
+                as: "modifierRating"
+            }
+        ];
+
+        if (!all) include.push({
+            model: Score,
+            as: "scores",
+            where: {
+                playerId: user?.beatleader
+            }
+        })
+
         const leaderboards = await Leaderboard.findAll({
             where: { type: LeaderboardType.Ranked },
-            include: [
-                {
-                    model: Difficulty,
-                    include: [Song]
-                },
-                {
-                    model: ModifierValues,
-                    as: "modifierValues"
-                },
-                {
-                    model: ModifierRatings,
-                    as: "modifierRating"
-                }
-            ]
+            include
         });
 
         const scores = leaderboards
@@ -867,6 +884,8 @@ export class PlaylistCommand extends Command {
             s.leaderboard.difficulty.song.name,
             `(${s.leaderboard.difficulty.key}:${s.leaderboard.leaderboardId})`
         ].join(" "));
+        
+        maps.unshift('Accuracy, Stars (w/ Mods), Difficulty, Name, (Map Key, Leaderboard ID)');
 
         const buffer = Buffer.from(maps.join("\n"), "utf-8");
         const text = new AttachmentBuilder(buffer, { name: "maps.txt" });
@@ -874,16 +893,18 @@ export class PlaylistCommand extends Command {
         const lbs = [...new Set(scores.map(s => s.leaderboard))];
         const playlist = PlaylistUtils.build(lbs, `plays-for-${pp}-pp`, user);
 
-        let content = `A list of maps that are worth ${pp}`;
-        if (mods.length) content += ` with ${mods.join(", ")}`;
+        const content = [`leaderboards each worth ${pp}pp`];
+        if (mods.length) content.push(`with ${mods.join("/")}`);
 
-        if (minAcc) content += ` higher than ${minAcc}%`;
-        if (maxAcc) {
-            if (minAcc) content += ` and`;
-            content += ` lower than ${maxAcc}%`;
-        }
+        if (minAcc) content.push(`higher than ${minAcc}%`);
+        if (maxAcc) content.push(`lower than ${maxAcc}%`);
 
-        await interaction.editReply({ content: `${content}.`, files: [text, playlist] });
+        const intl = new Intl.ListFormat("en", { style: "long" });
+
+        await interaction.editReply({
+            content: [lbs.length, content.length ? intl.format(content) : ""].join(" "),
+            files: [text, playlist]
+        });
     }
 
     async userScores(interaction: ChatInputCommandInteraction) {
@@ -906,15 +927,18 @@ export class PlaylistCommand extends Command {
         }
 
         await interaction.deferReply();
+        const content: string[] = [];
 
         const where: WhereOptions = {};
         const opts = interaction.options;
 
         const name = opts.getString("name", true);
         const type = opts.getString("type");
+        
+        const status = !type ? "" : type == "3" ? "ranked" : "unranked";
 
         const acc = [opts.getNumber("min-acc"), opts.getNumber("max-acc")];
-        const pp = [opts.getNumber("pp-acc"), opts.getNumber("max-pp")];
+        const pp = [opts.getNumber("min-pp"), opts.getNumber("max-pp")];
 
         if (acc[0] != null && acc[1] != null && acc[0] > acc[1]) {
             await interaction.editReply("Minimum accuracy cannot be higher than maximum accuracy.")
@@ -926,11 +950,25 @@ export class PlaylistCommand extends Command {
             return;
         }
 
-        if (acc[0] != null) (where.accuracy = where.accuracy ?? {})[Op.gte] = (acc[0] / 100);
-        if (acc[1] != null) (where.accuracy = where.accuracy ?? {})[Op.lte] = (acc[1] / 100);
+        if (acc[0] != null) {
+            (where.accuracy = where.accuracy ?? {})[Op.gte] = (acc[0] / 100);
+            content.push(`higher than ${acc[0]}%`);
+        }
 
-        if (pp[0] != null) (where.pp = where.pp ?? {})[Op.gte] = pp[0];
-        if (pp[1] != null) (where.pp = where.pp ?? {})[Op.lte] = pp[1];
+        if (acc[1] != null) {
+            (where.accuracy = where.accuracy ?? {})[Op.lte] = (acc[1] / 100);
+            content.push(`lower than ${acc[1]}%`);
+        }
+
+        if (pp[0] != null) {
+            (where.pp = where.pp ?? {})[Op.gte] = pp[0];
+            content.push(`higher than ${pp[0]}pp`);
+        }
+        
+        if (pp[1] != null) {
+            (where.pp = where.pp ?? {})[Op.lte] = pp[1];
+            content.push(`lower than ${pp[1]}pp`);
+        }
 
         const scores = await Score.findAll({
             where,
@@ -953,7 +991,12 @@ export class PlaylistCommand extends Command {
         });
 
         const leaderboards = [...new Set(scores.map(s => s.leaderboard))];
+        const intl = new Intl.ListFormat("en", { style: "long" });
+
         const file = PlaylistUtils.build(leaderboards, name, user);
-        await interaction.editReply({ files: [file] });
+        await interaction.editReply({
+            content: [leaderboards.length, status, `leaderboards`, content.length ? intl.format(content) : ""].join(" "),
+            files: [file]
+        });
     }
 }
