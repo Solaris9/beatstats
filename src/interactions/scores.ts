@@ -627,6 +627,45 @@ export class PlaylistCommand extends Command {
                             required: true
                         },
                         {
+                            type: ChatInteractionOptionType.BOOLEAN,
+                            name: "comparison",
+                            description: "Shows the increase needed, only works with all:False",
+                        },
+                        {
+                            type: ChatInteractionOptionType.STRING,
+                            name: "direction",
+                            description: "The direction to sort",
+                            choices: [
+                                {
+                                    name: "High -> Low",
+                                    value: ">"
+                                },
+                                {
+                                    name: "Low -> High",
+                                    value: "<"
+                                }
+                            ]
+                        },
+                        {
+                            type: ChatInteractionOptionType.STRING,
+                            name: "sort",
+                            description: "The order to sort the scores",
+                            choices: [
+                                {
+                                    name: "Accuracy",
+                                    value: "acc"
+                                },
+                                {
+                                    name: "Stars",
+                                    value: "stars"
+                                },
+                                {
+                                    name: "Increase",
+                                    value: "increase"
+                                }
+                            ]
+                        },
+                        {
                             type: ChatInteractionOptionType.DOUBLE,
                             name: "min-acc",
                             description: "The minimum accuracy set.",
@@ -755,6 +794,9 @@ export class PlaylistCommand extends Command {
 
         const all = interaction.options.getBoolean("all", true);
         const pp = interaction.options.getNumber("pp", true);
+        const comparison = interaction.options.getBoolean("comparison", false);
+        const sort = interaction.options.getString("sort", false);
+        const direction = interaction.options.getString("direction", false);
 
         const minAcc = interaction.options.getNumber("min-acc", false);
         const maxAcc = interaction.options.getNumber("max-acc", false);
@@ -798,13 +840,19 @@ export class PlaylistCommand extends Command {
             }
         ];
 
-        if (!all) include.push({
-            model: Score,
-            as: "scores",
-            where: {
-                playerId: user?.beatleader
-            }
-        })
+        if (!all) {
+            const opts: any = {
+                model: Score,
+                as: "scores",
+                where: {
+                    playerId: user?.beatleader,
+                }
+            };
+
+            if (comparison) opts.where!.pp = { [Op.lt]: pp }
+
+            include.push(opts);
+        };
 
         const leaderboards = await Leaderboard.findAll({
             where: { type: LeaderboardType.Ranked },
@@ -870,22 +918,38 @@ export class PlaylistCommand extends Command {
 
                 return {
                     leaderboard: l,
-                    accuracy: acc * 100,
-                    stars: this.getStars(passRating, accRating, techRating).toFixed(2)
+                    requiredAcc: acc * 100,
+                    currentAcc: l.scores[0].accuracy * 100,
+                    stars: this.getStars(passRating, accRating, techRating)
                 }
             })
-            .filter(s => s.accuracy && s.leaderboard.difficulty)
-            .sort((a, b) => a.accuracy - b.accuracy);
-            
-        const maps = scores.map(s => [
-            s.accuracy.toFixed(4),
-            s.stars,
-            getDifficultyName(s.leaderboard.difficulty.difficulty),
-            s.leaderboard.difficulty.song.name,
-            `(${s.leaderboard.difficulty.key}:${s.leaderboard.leaderboardId})`
-        ].join(" "));
+            .filter(s => s.requiredAcc && s.leaderboard.difficulty)
+            .sort((a, b) => a.requiredAcc - b.requiredAcc);
         
-        maps.unshift('Accuracy, Stars (w/ Mods), Difficulty, Name, (Map Key, Leaderboard ID)');
+        if (sort) scores.sort((a, b) => {
+            if (direction == "<") {
+                let temp = a;
+                a = b;
+                b = temp;
+            }
+
+            if (sort == "stars") return b.stars - a.stars;
+            else if (sort == "acc") return b.requiredAcc - a.requiredAcc;
+            else return (b.requiredAcc - b.currentAcc) - (a.requiredAcc - a.currentAcc);
+        });
+        
+        const maps = scores.map(s => [
+                s.requiredAcc.toFixed(4),
+                comparison ? `+${(s.requiredAcc - s.currentAcc).toFixed(4)}%` : null,
+                s.stars.toFixed(2),
+                getDifficultyName(s.leaderboard.difficulty.difficulty),
+                s.leaderboard.difficulty.song.name,
+                `(${s.leaderboard.difficulty.key}:${s.leaderboard.leaderboardId})`
+            ]
+            .filter(v => v != null)
+            .join(" "));
+
+        maps.unshift(`Accuracy${comparison ? ` (+ comparison)` : ''}, Stars (w/ Mods), Difficulty, Name, (Map Key, Leaderboard ID)`);
 
         const buffer = Buffer.from(maps.join("\n"), "utf-8");
         const text = new AttachmentBuilder(buffer, { name: "maps.txt" });
