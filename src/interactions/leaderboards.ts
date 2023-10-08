@@ -4,6 +4,8 @@ import cron from "node-cron";
 import { Clan, User } from "../database";
 import { Op } from "sequelize";
 
+let nameCache = {} as Record<string, string>;
+
 export const leaderboardFunction = async (client: Client) => {
     const leaderboards = {
         "totalPP": "Total PP",
@@ -38,10 +40,8 @@ export const leaderboardFunction = async (client: Client) => {
             continue;
         }
 
-        const members = await guild.members.fetch()
         const messages = await channel.messages.fetch();
         const entries = Object.entries(leaderboards);
-        const nameCache = {} as Record<string, string>;
 
         for (let [leaderboard, name] of entries) {
             const users = await User.findAll({
@@ -63,8 +63,10 @@ export const leaderboardFunction = async (client: Client) => {
             // }
 
             for (let user of users) {
-                const name = members.get(user.discord)?.user.username ?? "N/A";
-                nameCache[user.discord] ??= name;
+                if (!nameCache[user.discord]) {
+                    const u = !user.discord ? null : await client.users.fetch(user.discord).catch(() => null);
+                    nameCache[user.discord] = u?.username ?? "N/A";
+                }
             }
 
             const file = await drawLeaderboard(leaderboard, name, users, nameCache);
@@ -78,4 +80,5 @@ export const leaderboardFunction = async (client: Client) => {
 
 export const onceReady = async (client: Client) => {
     cron.schedule("0 * * * *", leaderboardFunction.bind(null, client));
+    cron.schedule("0 0 * * *", () => nameCache = {});
 };

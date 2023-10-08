@@ -553,8 +553,6 @@ export default async (score: Score) => {
     //#endregion
    
     const data = stage.toDataURL();
-
-    stage.clear();
     stage.destroy();
 
     return data;
