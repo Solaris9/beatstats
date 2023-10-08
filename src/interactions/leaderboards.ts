@@ -1,4 +1,4 @@
-import { Client, Guild, GuildTextBasedChannel } from "discord.js";
+import { Client, Guild, GuildTextBasedChannel, PermissionFlagsBits } from "discord.js";
 import drawLeaderboard from "../drawing/leaderboards";
 import cron from "node-cron";
 import { Clan, User } from "../database";
@@ -35,6 +35,14 @@ export const leaderboardFunction = async (client: Client) => {
         
         const channel = await guild.channels.fetch(clan.leaderboardsChannel!).catch(() => null) as GuildTextBasedChannel;
         if (!channel) {
+            clan.leaderboardsChannel = null
+            await clan.save();
+            continue;
+        }
+
+        const perms = channel.permissionsFor(guild.members.me!)
+
+        if (!perms.has(PermissionFlagsBits.SendMessages) || !perms.has(PermissionFlagsBits.AttachFiles)) {
             clan.leaderboardsChannel = null
             await clan.save();
             continue;
