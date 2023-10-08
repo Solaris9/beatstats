@@ -29,6 +29,7 @@ export default class ModifierValues extends Model {
 export const createModifierValues = async (id: string, difficulty: IDifficulty, replace = false) => {
     if (
         difficulty.status != LeaderboardType.Ranked ||
+        difficulty.modifierValues == null ||
         difficulty.modifierValues?.modifierId == 0
     ) return;
 
