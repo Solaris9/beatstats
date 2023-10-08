@@ -1,4 +1,4 @@
-import { Client, Events, IntentsBitField, Partials } from "discord.js";
+import { Client, Events, IntentsBitField, Interaction, Partials, User } from "discord.js";
 import { Leaderboard, createLeaderboard, createSong, createSongDifficulty, sequelize } from "./database/index.js";
 import ModifierRatings, { createModifierRating } from "./database/models/LeaderboardModifierRatings.js";
 import ModifierValues, { createModifierValues } from "./database/models/LeaderboardModifierValues.js";
@@ -110,24 +110,17 @@ if (interactions.size) {
 
             if (interaction.isStringSelectMenu()) {
                 const command = interactions.find(i => interaction.customId.startsWith(i.options.name));
-                if (command) try {
-                    await command.onStringSelect!(interaction);
-                } catch (err: any) {
-                    await interaction.channel?.send(logError(err));
-                }
+                if (command) command.onStringSelect!(interaction);
             }
 
             if (interaction.isButton()) {
                 const command = interactions.find(i => interaction.customId.startsWith(i.options.name));
-                if (command) try {
-                    await command.onButtonClick!(interaction);
-                } catch (err: any) {
-                    await interaction.channel?.send(logError(err));
-                }
+                if (command) await command.onButtonClick!(interaction);
             }
         } catch (err: any) {
             try {
-                await interaction.channel?.send(logError(err));
+                const name = interaction.isCommand() ? interaction.commandName : interaction.id;
+                await interaction.channel?.send(logError(interaction.user, err, name));
             } catch (err: any) {
                 logger.error("Fatal error:");
                 console.error(err);
@@ -150,7 +143,7 @@ if (commands.size) {
             try {
                 await command(client, message, args);
             } catch (err: any) {
-                await message.channel.send(logError(err));
+                await message.channel.send(logError(message.author, err, name));
             }
         }
     });
@@ -171,10 +164,10 @@ sequelize.sync()
 process.on("unhandledRejection", logger.error.bind(null));
 process.on("uncaughtException", logger.error.bind(null));
 
-function logError(err: Error) {
+function logError(user: User, err: Error, name: string) {
     const id = Math.random().toString(16).slice(2);
 
-    logger.error(`An error occurred while executing a command (${id}):`);
+    logger.error(`An error occurred while executing command ${name} by ${user.username}:${user.id} (${id}):`);
     console.error(err);
 
     return `An error occurred while executing this command. (\`${id}\`)`;
