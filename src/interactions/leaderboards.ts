@@ -24,7 +24,7 @@ export const leaderboardFunction = async (client: Client) => {
         }
     });
 
-    for (let clan of clans) {
+    clan: for (let clan of clans) {
         const guild = await client.guilds.fetch(clan.guild!).catch(() => null) as Guild;
         if (!guild) {
             clan.guild = null
@@ -81,7 +81,13 @@ export const leaderboardFunction = async (client: Client) => {
             const existing = messages.find(m => m.attachments.find(f => f.name.includes(leaderboard)));
 
             if (existing) await existing.edit({ files: [file] });
-            else await channel.send({ files: [file] });
+            else try {
+                await channel.send({ files: [file] });
+            } catch (err) {
+                clan.leaderboardsChannel = null
+                await clan.save();
+                continue clan;
+            }
         }
     }
 }

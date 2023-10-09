@@ -919,7 +919,7 @@ export class PlaylistCommand extends Command {
                 return {
                     leaderboard: l,
                     requiredAcc: acc * 100,
-                    currentAcc: l.scores[0].accuracy * 100,
+                    currentAcc: all ? 0 : l.scores[0].accuracy * 100,
                     stars: this.getStars(passRating, accRating, techRating)
                 }
             })
@@ -939,15 +939,13 @@ export class PlaylistCommand extends Command {
         });
         
         const maps = scores.map(s => [
-                s.requiredAcc.toFixed(4),
-                comparison ? `+${(s.requiredAcc - s.currentAcc).toFixed(4)}%` : null,
-                s.stars.toFixed(2),
-                getDifficultyName(s.leaderboard.difficulty.difficulty),
-                s.leaderboard.difficulty.song.name,
-                `(${s.leaderboard.difficulty.key}:${s.leaderboard.leaderboardId})`
-            ]
-            .filter(v => v != null)
-            .join(" "));
+            s.requiredAcc.toFixed(4),
+            comparison ? `+${(s.requiredAcc - s.currentAcc).toFixed(4)}%` : null,
+            s.stars.toFixed(2),
+            getDifficultyName(s.leaderboard.difficulty.difficulty),
+            s.leaderboard.difficulty.song.name,
+            `(${s.leaderboard.difficulty.key}:${s.leaderboard.leaderboardId})`
+        ].filter(v => v != null).join(" "));
 
         maps.unshift(`Accuracy${comparison ? ` (+ comparison)` : ''}, Stars (w/ Mods), Difficulty, Name, (Map Key, Leaderboard ID)`);
 
