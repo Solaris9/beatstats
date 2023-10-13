@@ -1,5 +1,5 @@
 import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable } from "discord.js";
-import { ChatInteractionOptionType, Command } from "../framework.js";
+import { ChatInteractionOption, ChatInteractionOptionType, Command } from "../framework.js";
 import { WebSocket } from "ws";
 import { ScoreImprovement, Stats, User, sequelize } from "../database";
 import { drawCard } from "../drawing/scores/index";
@@ -93,9 +93,32 @@ export const onceReady = async (client: Client) => {
     connectLiveScores();
 };
 
+const contexts = [
+    {
+        name: "No Mods",
+        value: "4"
+    },
+    {
+        name: "No Pause",
+        value: "8"
+    },
+    {
+        name: "Golf",
+        value: "16"
+    }
+];
+
 export class ShareScoresCommand extends Command {
     constructor() {
+        const context: ChatInteractionOption = {
+            type: ChatInteractionOptionType.STRING,
+            name: "context",
+            description: "The leaderboard context to use. Default: General ",
+            choices: contexts
+        };
+
         const options = [
+            context,
             {
                 type: ChatInteractionOptionType.USER,
                 name: "user",
@@ -124,6 +147,7 @@ export class ShareScoresCommand extends Command {
                     name: "search",
                     description: "Share a score by searching!",
                     options: [
+                        context,
                         {
                             type: ChatInteractionOptionType.STRING,
                             name: "name",
@@ -177,12 +201,14 @@ export class ShareScoresCommand extends Command {
             }
         }
     
+        const leaderboardContext = interaction.options.getString("context", false) ?? "2";
         const sortBy = sub == "recent" ? "date" : "pp";
 
         const json = await beatleader.player[user.beatleader].scores.get_json({
             query: {
                 sortBy,
-                count: 25
+                count: 25,
+                leaderboardContext
             }
         });
 
@@ -242,6 +268,8 @@ export class ShareScoresCommand extends Command {
             return;
         }
 
+        const discord = (interaction.options.getUser("user", false) ?? interaction.user).id;
+
         const query = new Query()
             .select(_Score.scoreId, _Score.accuracy, _Score.pp, _Score.timeSet)
             .select(_Leaderboard.type)
@@ -250,7 +278,7 @@ export class ShareScoresCommand extends Command {
             .from(_Score)
             .join(_User)
             .where(_User.beatleader, "=", _Score.playerId)
-            .where(_User.discord, "=", interaction.user.id)
+            .where(_User.discord, "=", discord)
             .join(_Leaderboard)
             .where(_Leaderboard.leaderboardId, "=", _Score.leaderboardId)
             .join(_Difficulty)
@@ -362,13 +390,13 @@ export class ShareScoresCommand extends Command {
         const int = this.#interactions[interaction.user.id];
         try { await int.deleteReply() } catch { }
 
-        await sendScoreCard(ids, interaction.channel as GuildTextBasedChannel, { isLive: false } );
+        await sendScoreCard(ids, interaction.channel as GuildTextBasedChannel, { isLive: false });
     }
 }
 
 type SendScoreOptions = Partial<{
     isLive: boolean;
-    reply: MessageResolvable
+    reply: MessageResolvable;
 }>;
 
 async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel, options?: SendScoreOptions) {
@@ -435,7 +463,7 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
         const song = score.leaderboard.difficulty.song.name;
         const timeSet = score.timeSet.getTime();
     
-        const inGuild = user.discord ? await channel.guild.members.fetch(user.discord).catch(() => null) : null;
+        const inGuild = user.discord ? await channel.client.users.fetch(user.discord).catch(() => null) : null;
         const prefix = inGuild ? `<@${score.user.discord}>` : score.user.name;
 
         const content = options?.isLive ?
