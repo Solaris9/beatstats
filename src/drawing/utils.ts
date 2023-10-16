@@ -78,6 +78,12 @@ export const HMDs: Record<number, HMD> = {
 		color: 'invert(49%) sepia(26%) saturate(5619%) hue-rotate(146deg) brightness(93%) contrast(86%)',
 		priority: 1,
 	},
+	512: {
+		name: 'Quest 3',
+		icon: 'meta.svg',
+		color: 'invert(49%) sepia(26%) saturate(5619%) hue-rotate(260deg) brightness(93%) contrast(86%)',
+		priority: 2,
+	},
 	64: {
 		name: 'Valve Index',
 		icon: 'index.svg',

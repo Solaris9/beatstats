@@ -49,7 +49,7 @@ export default async (score: Score) => {
 
     const playerName = score.user.name;
     const playerAvatar = score.user.avatar;
-    const playerHmd = HMDs[score.hmd];
+    const playerHmd = HMDs[score.hmd] ?? HMDs[0];
     const playerCountry = "https://flagsapi.com/" + score.user.country + "/flat/64.png";
 
     const scoreDate = new Date(score.timeSet.getTime() * 1000).toDateString();
