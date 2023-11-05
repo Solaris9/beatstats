@@ -25,10 +25,8 @@ export class RefreshMeCommand extends Command {
 
     async execute(interaction: ChatInputCommandInteraction<CacheType>): Promise<void> {
         let user = await User.findOne({ where: { discord: interaction.user.id } });
-        let isNewUser = false;
         if (!user) {
             user = await createUser(CreateUserMethod.Discord, interaction.user.id);
-            isNewUser = true;
             
             if (!user) {
                 await interaction.reply({
@@ -46,7 +44,7 @@ export class RefreshMeCommand extends Command {
         });
 
         const force = !!interaction.options.getBoolean("force");
-        await user.refresh(true, force, !isNewUser);
+        await user.refresh(force);
 
         await resp.edit("Synced your profile!");
     }

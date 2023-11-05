@@ -49,44 +49,40 @@ export default class User extends Model {
     @AllowNull @Column
     declare youtubeEnabled: boolean;
 
-    async refresh(full = false, force = false, basic = true) {        
-        if (basic) {
-            logger.info(`Refreshing user ${this.name ?? "N/A"} (${this.beatleader}, ${this.discord})`);
-            const profile = await beatleader.player[this.beatleader].get_json();
+    async refresh(force = false) {        
+        logger.info(`Refreshing user ${this.name ?? "N/A"} (${this.beatleader}, ${this.discord})`);
+        const profile = await beatleader.player[this.beatleader].get_json();
 
-            this.name = profile.name;
-            this.country = profile.country;
-            this.avatar = profile.avatar;
-            this.clans = profile.clans.map(c => c.tag).join(",");
-            
-            this.totalPP = profile.pp;
-            this.passPP = profile.passPp;
-            this.accPP = profile.accPp;
-            this.techPP = profile.techPp;
-            this.topPP = profile.scoreStats.topPp;
+        this.name = profile.name;
+        this.country = profile.country;
+        this.avatar = profile.avatar;
+        this.clans = profile.clans.map(c => c.tag).join(",");
+        
+        this.totalPP = profile.pp;
+        this.passPP = profile.passPp;
+        this.accPP = profile.accPp;
+        this.techPP = profile.techPp;
+        this.topPP = profile.scoreStats.topPp;
 
-            this.accuracyRankedAverage = profile.scoreStats.averageRankedAccuracy;
-            this.accuracyRankedWeightedAverage = profile.scoreStats.averageWeightedRankedAccuracy;
-        }
+        this.accuracyRankedAverage = profile.scoreStats.averageRankedAccuracy;
+        this.accuracyRankedWeightedAverage = profile.scoreStats.averageWeightedRankedAccuracy;
 
-        if (full) {
-            if (force) await Score.destroy({ where: { playerId: this.beatleader } });
-            const lastCache = force ? null : this.lastFullCache;
+        if (force) await Score.destroy({ where: { playerId: this.beatleader } });
+        const lastCache = force ? null : this.lastFullCache;
 
-            const scores = await this.fetchScores(lastCache);
-            await Promise.all(scores.map(async s => {
-                await createSong(s.leaderboard.song);
-                await createLeaderboard(s.leaderboard);
-                await createSongDifficulty(s.leaderboard);
-                await createModifierValues(s.leaderboardId, s.leaderboard.difficulty);
-                await createModifierRating(s.leaderboardId, s.leaderboard.difficulty);
-                await createScore(s);
-            }));
+        const scores = await this.fetchScores(lastCache);
+        await Promise.all(scores.map(async s => {
+            await createSong(s.leaderboard.song);
+            await createLeaderboard(s.leaderboard);
+            await createSongDifficulty(s.leaderboard);
+            await createModifierValues(s.leaderboardId, s.leaderboard.difficulty);
+            await createModifierRating(s.leaderboardId, s.leaderboard.difficulty);
+            await createScore(s);
+        }));
 
-            if (scores.length) {
-                this.lastFullCache = Number(scores.at(0)!.timepost) + 1;
-                logger.info(`Fetching ${scores.length} scores for user ${this.name} (${this.beatleader}, ${this.discord})`);
-            }
+        if (scores.length) {
+            this.lastFullCache = Number(scores.at(0)!.timepost) + 1;
+            logger.info(`Fetching ${scores.length} scores for user ${this.name} (${this.beatleader}, ${this.discord})`);
         }
 
         await this.save();

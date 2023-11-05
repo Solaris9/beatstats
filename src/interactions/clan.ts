@@ -170,7 +170,7 @@ export class ClanCommands extends Command {
         } else {
             await interaction.reply({
                 ephemeral: true,
-                content: `You do not own any clans.`
+                content: `You do not own any clans. If this is an mistake, please run \`/refresh full=True\``
             });
         }
     }
