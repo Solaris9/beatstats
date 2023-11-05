@@ -6,7 +6,7 @@ import { Logger } from "../utils/logger";
 import Clan from "../database/models/Clan";
 import { Op } from "sequelize";
 import { CreateUserMethod, createUser } from "../database/models/User";
-import { leaderboardFunction } from "./leaderboards";
+import { leaderboardFunction, leaderboardKV, leaderboardVK, leaderboards } from "./leaderboards";
 import { checkPermission } from "../utils/utils";
 
 export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
@@ -65,7 +65,17 @@ export class ClanCommands extends Command {
                             description: "Set a channel or omit to remove it."
                         }
                     ]
-                }
+                },
+                {
+                    type: ChatInteractionOptionType.SUB_COMMAND,
+                    name: "leaderboards",
+                    description: "Enable or disable a leaderboard from showing.",
+                    options: Object.entries(leaderboards).map(([key, desc]) => ({
+                        name: leaderboardKV[key],
+                        description: desc,
+                        type: ChatInteractionOptionType.BOOLEAN,
+                    }))
+                },
             ]
         })
     }
@@ -109,6 +119,7 @@ export class ClanCommands extends Command {
         else if (sub == "setup") this.setup(interaction);
         else if (sub == "channel") this.channel(interaction);
         else if (sub == "info") this.info(interaction);
+        else if (sub == "leaderboards") this.leaderboards(interaction);
     }
 
     async setup(interaction: ChatInputCommandInteraction) {        
@@ -238,18 +249,20 @@ export class ClanCommands extends Command {
         const embed = new EmbedBuilder();
         embed.setTitle("Guild clan settings");
 
+        const lbs = clan.leaderboards.split(",").filter(l => !!l);
+
         const settingsField = [
             ...channelTypes.map(t => `${t.name}: ${clan[t.value] ? `<#${clan[t.value]}>` : "N/A"}`),
+            `Leaderboards: ${!lbs.length ? "All" : `\`${lbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``}`
         ];
 
         const hasAnySettings = channelTypes.find(t => clan[t.value] != null);
-        if (!hasAnySettings) settingsField.push(`**Tip:** Run \`/clan channel\` to configure this.`);
+        if (!hasAnySettings) settingsField.push(`**Tip:** Run \`/clan channel|leaderboards\` to configure this.`);
 
         embed.addFields({
             name: "Settings",
             value: settingsField.join("\n")
         });
-
 
         const cachedMembers = await User.count({
             where: {
@@ -271,6 +284,39 @@ export class ClanCommands extends Command {
         await interaction.reply({
             ephemeral: true,
             embeds: [embed]
+        });
+    }
+
+    async leaderboards(interaction: ChatInputCommandInteraction) {
+        const clan = await this._checkClan(interaction)
+        if (!clan) return;
+
+        const user = await this._checkOwner(clan, interaction);
+        if (!user) return;
+
+        const lbs = Object.keys(leaderboardVK)
+            .map(k => [k, interaction.options.getBoolean(k, false)])
+            .filter(([, o]) => o != null) as [string, boolean][];
+        
+        const clanLbs = clan.leaderboards.split(",").filter(l => !!l);
+        
+        for (let [name, bool] of lbs) {
+            const contains = clanLbs.includes(name);
+
+            if (!bool && contains) {
+                const i = clanLbs.indexOf(name);
+                clanLbs.splice(i, 1);
+            } else if (bool && !contains) {
+                clanLbs.push(name);
+            }
+        }
+
+        clan.leaderboards = clanLbs.join(",");
+        await clan.save();
+
+        await interaction.reply({
+            ephemeral: true,
+            content: `Updated leaderboards list, now displaying:\n\`${clanLbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``
         });
     }
 }

@@ -1,6 +1,5 @@
 import { ChatInputCommandInteraction, CacheType } from "discord.js";
 import { ChatInteractionOptionType, Command } from "../framework";
-import { trim } from "../utils/utils";
 import { Score, Stats, User } from "../database";
 
 export class InviteCommand extends Command {
@@ -22,12 +21,12 @@ export class BotCommand extends Command {
     constructor() {
         super({
             name: "bot",
-            description: "Shows info about the bot.",
+            description: "Shows information about the bot.",
             options: [
                 {
                     type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "info",
-                    description: "Shows info about the bot."
+                    name: "stats",
+                    description: "Shows stats about the bot."
                 }
             ]
         });
@@ -35,10 +34,10 @@ export class BotCommand extends Command {
 
     async execute(interaction: ChatInputCommandInteraction<CacheType>) {
         const sub = interaction.options.getSubcommand();
-        if (sub == "info") this.info(interaction);
+        if (sub == "stats") this.stats(interaction);
     }
 
-    async info(interaction: ChatInputCommandInteraction) {
+    async stats(interaction: ChatInputCommandInteraction) {
         const stats = await Stats.findOne({ where: { id: 0 }}) as Stats;
         const cachedScores = await Score.count();
         const cachedUsers = await User.count();

@@ -44,7 +44,7 @@ export class RefreshMeCommand extends Command {
         });
 
         const force = !!interaction.options.getBoolean("force");
-        await user.refresh(force);
+        await user.refresh(true, force);
 
         await resp.edit("Synced your profile!");
     }

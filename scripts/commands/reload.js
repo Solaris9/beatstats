@@ -12,6 +12,8 @@ const { join } = require("path");
         ...v.options
     }));
 
+    // console.log(commands[4].options[4])
+
     const existing = await rest.get(Routes.applicationCommands(applicationId));
     await Promise.all(existing.map(e => rest.delete(Routes.applicationCommand(applicationId, e.id))));
 

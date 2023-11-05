@@ -1,4 +1,4 @@
-import { AllowNull, Column, Model, Table, Unique } from "sequelize-typescript";
+import { AllowNull, Column, Default, Model, Table, Unique } from "sequelize-typescript";
 import { beatleader } from "../../api.js";
 import { IPlayer } from "../../types/beatleader.js";
 import { DataTypes, Op } from "sequelize";
@@ -20,6 +20,9 @@ export default class Clan extends Model {
 
     @AllowNull @Column(DataTypes.STRING)
     declare leaderboardsChannel: string | null;
+
+    @Default("") @Column
+    declare leaderboards: string;
 
     @Column declare memberCount: number;
 

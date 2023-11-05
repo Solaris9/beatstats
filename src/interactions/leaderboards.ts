@@ -4,19 +4,39 @@ import cron from "node-cron";
 import { Clan, User } from "../database";
 import { Op } from "sequelize";
 
+export const leaderboards = {
+    "totalPP": "Total PP",
+    "passPP": "Pass PP",
+    "accPP": "Accuracy PP",
+    "techPP": "Tech PP",
+    "topPP": "Top PP",
+    "accuracyRankedAverage": "Ranked Accuracy",
+    "accuracyRankedWeightedAverage": "Weighted Ranked Accuracy",
+} as const;
+
+export const leaderboardKV = {
+    "totalPP": "total-pp",
+    "passPP": "pass-pp",
+    "accPP": "accuracy-pp",
+    "techPP": "tech-pp",
+    "topPP": "top-pp",
+    "accuracyRankedAverage": "ranked-accuracy",
+    "accuracyRankedWeightedAverage": "weighted-ranked-accuracy",
+} as const;
+
+export const leaderboardVK = {
+    "total-pp": "totalPP",
+    "pass-pp": "passPP",
+    "accuracy-pp": "accPP",
+    "tech-pp": "techPP",
+    "top-pp": "topPP",
+    "ranked-accuracy": "accuracyRankedAverage",
+    "weighted-ranked-accuracy": "accuracyRankedWeightedAverage",
+} as const;
+
 let nameCache = {} as Record<string, string>;
 
 export const leaderboardFunction = async (client: Client) => {
-    const leaderboards = {
-        "totalPP": "Total PP",
-        "passPP": "Pass PP",
-        "accPP": "Accuracy PP",
-        "techPP": "Tech PP",
-        "topPP": "Top PP",
-        "accuracyRankedAverage": "Ranked Accuracy",
-        "accuracyRankedWeightedAverage": "Weighted Ranked Accuracy",
-    } as const;
-
     const clans = await Clan.findAll({
         where: {
             guild: { [Op.not]: null },
@@ -49,9 +69,14 @@ export const leaderboardFunction = async (client: Client) => {
         }
 
         const messages = await channel.messages.fetch();
-        const entries = Object.entries(leaderboards);
+        let entries = Object.keys(leaderboards);
 
-        for (let [leaderboard, name] of entries) {
+        if (clan.leaderboards != "") {
+            const lbs = clan.leaderboards.split(",").filter(l => !!l);
+            entries = entries.filter(e => lbs.includes(leaderboardKV[e]));
+        }
+
+        for (let leaderboard of entries) {
             const users = await User.findAll({
                 order: [[leaderboard, "DESC"]],
                 where: { clans: { [Op.like]: `%${clan.tag}%` }},
@@ -77,7 +102,7 @@ export const leaderboardFunction = async (client: Client) => {
                 }
             }
 
-            const file = await drawLeaderboard(leaderboard, name, users, nameCache);
+            const file = await drawLeaderboard(leaderboard, leaderboards[leaderboard], users, nameCache);
             const existing = messages.find(m => m.attachments.find(f => f.name.includes(leaderboard)));
 
             if (existing) await existing.edit({ files: [file] });
@@ -93,6 +118,6 @@ export const leaderboardFunction = async (client: Client) => {
 }
 
 export const onceReady = async (client: Client) => {
-    cron.schedule("0 * * * *", leaderboardFunction.bind(null, client));
+    cron.schedule("0 */2 * * *", leaderboardFunction.bind(null, client));
     cron.schedule("0 0 * * *", () => nameCache = {});
 };
