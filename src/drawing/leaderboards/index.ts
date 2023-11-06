@@ -1,11 +1,9 @@
 import { AttachmentBuilder, Client } from "discord.js";
 import Konva from "konva";
-import { User } from "../../database";
 import { writeFile } from "fs/promises";
 import { KonvaImageFromURL } from "../utils";
 import { ImageConfig } from "konva/lib/shapes/Image";
-
-const formatter = new Intl.NumberFormat("en");
+import { leaderboards } from "../../interactions/leaderboards";
 
 const width = 1000;
 const height = 525;
@@ -16,14 +14,19 @@ const rankColours = {
     0: "gold",
     1: "silver",
     2: "brown"
-}
+};
+
+const parts = ["Note: This requires", "/refresh", "to be ran"];
 
 const handle = async (
     leaderboard: string,
-    name: string,
-    users: User[],
-    nameCache: Record<string, string>
+    rows: [name: string, avatar: string, value: string][],
 ) => {
+    const size = new Konva.Text({ fontSize: 25 }).measureSize(parts.join(" "));
+    const start = width - size.width - 20;
+
+    const name = leaderboards[leaderboard];
+
     // @ts-ignore
     const stage = new Konva.Stage({
         x: 0, y: 0,
@@ -55,13 +58,31 @@ const handle = async (
 
     layer.add(leaderboardName);
 
+    let x = start;
+    if (leaderboard.startsWith("c_")) {
+        for (let i = 0; i < parts.length; i++) {
+            const cacheNotice = new Konva.Text({
+                x, y: 20,
+                fontSize: 25,
+                text: parts[i],
+                fill: i == 1 ? "gold" : "white"
+            });
+
+            if (i > 0) {
+                const size = cacheNotice.measureSize(parts[i - 1]);
+                cacheNotice.x(cacheNotice.x() + size.width);
+            }
+
+            x = cacheNotice.x() + cacheNotice.measureSize(" ").width;
+            
+            layer.add(cacheNotice);
+        }
+    }
+
     let startY = 60;
    
-    for (let i = 0; i < users.length; i++) {
-        const user = users[i];
-        const text = leaderboard.includes("accuracy") ?
-            `${(user[leaderboard] * 100).toFixed(2)}%` :
-            `${formatter.format(user[leaderboard])}PP`;
+    for (let i = 0; i < rows.length; i++) {
+        const [name, avatar, value] = rows[i];
 
         const playerRankText = new Konva.Text({
             x: 15, y: startY + 7.5,
@@ -70,8 +91,8 @@ const handle = async (
             fill: rankColours[i] ?? "white"
         });
 
-        const avatar = await KonvaImageFromURL(user.avatar);
-        avatar.setAttrs({
+        const avatarImg = await KonvaImageFromURL(avatar);
+        avatarImg.setAttrs({
             x: 80, y: startY,
             width: avatarSize,
             height: avatarSize,
@@ -81,7 +102,7 @@ const handle = async (
         const playerNameText = new Konva.Text({
             x: 125, y: startY + 7.5,
             fontSize,
-            text: `${user.name} (${nameCache[user.discord]})`,
+            text: name,
             fill: "white"
         });
 
@@ -89,13 +110,13 @@ const handle = async (
             y: startY  + 7.5,
             fontSize,
             fill: rankColours[i] ?? "white",
-            text
+            text: value
         });
 
-        const rect = playerNameText.measureSize(text);
+        const rect = playerNameText.measureSize(value);
         playerValueText.x(width - 20 - rect.width);
 
-        layer.add(playerRankText, avatar, playerNameText, playerValueText);
+        layer.add(playerRankText, avatarImg, playerNameText, playerValueText);
 
         startY += 45;
     };

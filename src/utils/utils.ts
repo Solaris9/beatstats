@@ -66,9 +66,9 @@ const permissionMessages = new Map([
     [PermissionFlagsBits.ViewChannel, "I am missing `View Channel` permission in this channel."]
 ]);
 
-export async function checkPermission(permissions: bigint[], interaction: ChatInputCommandInteraction);
-export async function checkPermission(permissions: bigint[], channel: GuildTextBasedChannel);
-export async function checkPermission(permissions: bigint[], interactionOrChannel: ChatInputCommandInteraction | GuildTextBasedChannel) {
+export async function checkPermission(permissions: bigint[], interaction: ChatInputCommandInteraction): Promise<string | undefined>;
+export async function checkPermission(permissions: bigint[], channel: GuildTextBasedChannel): Promise<string | undefined>;
+export async function checkPermission(permissions: bigint[], interactionOrChannel: ChatInputCommandInteraction | GuildTextBasedChannel): Promise<string | undefined> {
     let channel: GuildTextBasedChannel;
     
     if (interactionOrChannel instanceof ChatInputCommandInteraction) {

@@ -213,6 +213,18 @@ export class ClanCommands extends Command {
 
         const channel = interaction.options.getChannel("channel", false) as GuildTextBasedChannel;
 
+        if (channel == null) {
+            await interaction.reply({
+                ephemeral: true,
+                content: `Reset the **${name}** channel.`
+            });
+
+            clan[type] = null;
+            await clan.save();
+
+            return;
+        }
+
         const missing = await checkPermission([
             PermissionFlagsBits.SendMessages,
             PermissionFlagsBits.SendMessagesInThreads,
@@ -223,22 +235,21 @@ export class ClanCommands extends Command {
             await interaction.reply({
                 ephemeral: true,
                 content: missing
-            })
+            });
+
             return;
         }
 
-        const setChannel = channel?.id ?? null;
-
-        if (type == "leaderboardsChannel" && clan[type] != setChannel) {
-            setTimeout(() => leaderboardFunction(interaction.client));
-        }
-
-        clan[type] = setChannel;
+        clan[type] = channel?.id;
         await clan.save();
+
+        let content = `Set the **${name}** channel to: ${channel}`;
+        if (type == "leaderboardsChannel") content += "\nThere are no leaderboards enabled by default, run "
+            + "`/clan leaderboards` with any of the leaderboards as options to enable them."
 
         await interaction.reply({
             ephemeral: true,
-            content: `Set the **${name}** channel to: ${channel}`
+            content
         });
     }
 
@@ -253,7 +264,7 @@ export class ClanCommands extends Command {
 
         const settingsField = [
             ...channelTypes.map(t => `${t.name}: ${clan[t.value] ? `<#${clan[t.value]}>` : "N/A"}`),
-            `Leaderboards: ${!lbs.length ? "All" : `\`${lbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``}`
+            `Leaderboards: ${!lbs.length ? "None" : `\`${lbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``}`
         ];
 
         const hasAnySettings = channelTypes.find(t => clan[t.value] != null);
@@ -294,6 +305,8 @@ export class ClanCommands extends Command {
         const user = await this._checkOwner(clan, interaction);
         if (!user) return;
 
+        await interaction.deferReply({ ephemeral: true });
+
         const lbs = Object.keys(leaderboardVK)
             .map(k => [k, interaction.options.getBoolean(k, false)])
             .filter(([, o]) => o != null) as [string, boolean][];
@@ -313,11 +326,12 @@ export class ClanCommands extends Command {
 
         clan.leaderboards = clanLbs.join(",");
         await clan.save();
+        
+        await interaction.editReply(
+            `Updated leaderboards list, now displaying:\n\`${clanLbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``
+        );
 
-        await interaction.reply({
-            ephemeral: true,
-            content: `Updated leaderboards list, now displaying:\n\`${clanLbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``
-        });
+        if (clan.leaderboards != "") await leaderboardFunction(interaction.client);
     }
 }
 
