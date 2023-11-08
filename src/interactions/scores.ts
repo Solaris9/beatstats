@@ -694,6 +694,11 @@ export class PlaylistCommand extends Command {
                             ]
                         },
                         {
+                            type: ChatInteractionOptionType.BOOLEAN,
+                            name: "modified-stars",
+                            description: "Whether to filter using modified stars.",
+                        },
+                        {
                             type: ChatInteractionOptionType.DOUBLE,
                             name: "min-acc",
                             description: "The minimum accuracy set.",
@@ -825,6 +830,7 @@ export class PlaylistCommand extends Command {
         const comparison = interaction.options.getBoolean("comparison", false);
         const sort = interaction.options.getString("sort", false);
         const direction = interaction.options.getString("direction", false);
+        const modifiedStars = interaction.options.getBoolean("modified-stars", false);
 
         const minAcc = interaction.options.getNumber("min-acc", false);
         const maxAcc = interaction.options.getNumber("max-acc", false);
@@ -887,10 +893,19 @@ export class PlaylistCommand extends Command {
             include
         });
 
-        const scores = leaderboards
+        type PotentialLeaderboard = {
+            leaderboard: Leaderboard,
+            requiredAcc: number,
+            currentAcc: number,
+            stars: number;
+        };
+
+        let scores = leaderboards
             .filter(l => {
-                if ((minStars && l.stars! < minStars) || (maxStars && l.stars! > maxStars)) return false;
-                return true;
+                if (modifiedStars) return true;
+
+                return (minStars && l.stars! > minStars) ||
+                    (maxStars && l.stars! < maxStars)
             })
             .map(l => {
                 let acc: number = 0;
@@ -944,15 +959,22 @@ export class PlaylistCommand extends Command {
                 if ((maxAcc && (maxAcc / 100) < acc) || (minAcc && (minAcc / 100) > acc)) acc = 0;
                 if (acc > 1) acc = 0;
 
-                return {
+                const res = {
                     leaderboard: l,
                     requiredAcc: acc * 100,
                     currentAcc: all ? 0 : l.scores[0].accuracy * 100,
                     stars: this.getStars(passRating, accRating, techRating)
                 }
+
+                if (modifiedStars && (
+                    (minStars && res.stars! < minStars) ||
+                    (maxStars && res.stars! > maxStars)
+                )) return null;
+
+                return res;
             })
-            .filter(s => s.requiredAcc && s.leaderboard.difficulty)
-            .sort((a, b) => a.requiredAcc - b.requiredAcc);
+            .filter(s => s != null && s.requiredAcc && s.leaderboard.difficulty)
+            .sort((a, b) => a!.requiredAcc - b!.requiredAcc) as PotentialLeaderboard[];
         
         if (sort) scores.sort((a, b) => {
             if (direction == "<") {
@@ -965,6 +987,11 @@ export class PlaylistCommand extends Command {
             else if (sort == "acc") return b.requiredAcc - a.requiredAcc;
             else return (b.requiredAcc - b.currentAcc) - (a.requiredAcc - a.currentAcc);
         });
+
+        if (scores.length == 0) {
+            await interaction.editReply("0 leaderboards found with that criteria, please try again with a different parameter.",);
+            return;
+        }
         
         const maps = scores.map(s => [
             s.requiredAcc.toFixed(4),
@@ -988,6 +1015,9 @@ export class PlaylistCommand extends Command {
 
         if (minAcc) content.push(`higher than ${minAcc}%`);
         if (maxAcc) content.push(`lower than ${maxAcc}%`);
+
+        if (minStars) content.push(`higher than ${minStars}\*`);
+        if (maxStars) content.push(`lower than ${maxStars}\*`);
 
         const intl = new Intl.ListFormat("en", { style: "long" });
 

@@ -130,7 +130,7 @@ export const leaderboardFunction = async (client: Client) => {
             const lb = leaderboard.includes("accuracy") ? "accuracy" :
                 leaderboard.includes("PP") ? "pp" : "stars";
             
-            const rows: [string, string, string, number][] = [];
+            let rows: [string, string, string, number][] = [];
 
             if (leaderboard.startsWith("c_")) {
                 const users = await User.findAll({
@@ -141,6 +141,8 @@ export const leaderboardFunction = async (client: Client) => {
                     const value = await customLeaderboards(u.beatleader, leaderboard);
                     rows.push([u.discord, `${u.name}`, u.avatar, value || 0]);
                 }
+
+                rows = rows.slice(0, 10)
             } else {
                 const users = await User.findAll({
                     order: [[leaderboard, "DESC"]],
@@ -174,7 +176,6 @@ export const leaderboardFunction = async (client: Client) => {
 
             const final = (
                 rows.sort((a, b) => b[3] - a[3])
-                .slice(0, 10)
                 .map(v => [`${v[1]} (${nameCache[v[0]]})`, v[2], formats[lb](v[3])])
             ) as[string, string, string][];
 
