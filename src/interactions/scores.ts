@@ -1016,8 +1016,8 @@ export class PlaylistCommand extends Command {
         if (minAcc) content.push(`higher than ${minAcc}%`);
         if (maxAcc) content.push(`lower than ${maxAcc}%`);
 
-        if (minStars) content.push(`higher than ${minStars}\*`);
-        if (maxStars) content.push(`lower than ${maxStars}\*`);
+        if (minStars) content.push(`higher than ${minStars}\\*`);
+        if (maxStars) content.push(`lower than ${maxStars}\\*`);
 
         const intl = new Intl.ListFormat("en", { style: "long" });
 
