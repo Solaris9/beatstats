@@ -1,14 +1,17 @@
-import { HMDs, KonvaImageFromURL, ModifiersList, centerText, getColour, truncate } from "../utils";
+import { HMDs, KonvaImageFromURL, ModifiersList, cacheImage, centerText, getColour, truncate } from "../utils";
 import Konva from "konva";
 import { Image, ImageConfig } from "konva/lib/shapes/Image";
 import { RectConfig } from "konva/lib/shapes/Rect";
 import { readFileSync } from "fs";
-import { join } from "path";
+import { join, basename } from "path";
 import { TextConfig } from "konva/lib/shapes/Text";
 import { Score } from "../../database";
 import { getDifficultyName } from "../../database/models/SongDifficulty.js";
 import { LeaderboardType } from "../../database/models/Leaderboard.js";
 import { Modifiers } from "../../database/models/Score.js";
+import { Logger } from "../../utils/logger";
+
+const logger = new Logger("Drawing")
 
 //#region extra
 
@@ -109,16 +112,31 @@ export default async (score: Score) => {
         songCoverImage,
         playerAvatarImage,
         playerCountryImage
-    ] = await Promise.all([
-        KonvaImageFromURL(songCover),
-        KonvaImageFromURL(playerAvatar),
-        KonvaImageFromURL(playerCountry)
+    ] = await Promise.allSettled([
+        cacheImage(songCover, "covers", basename(songCover)),
+        cacheImage(playerAvatar, "avatars", basename(playerAvatar)),
+        cacheImage(playerCountry, "flags", `${score.user.country}.png`)
     ]);
+
+    if (songCoverImage.status == "rejected") {
+        logger.error(`scores: Unable to fetch song cover: ${songCoverImage.reason}`);
+        return null;
+    }
+
+    if (playerAvatarImage.status == "rejected") {
+        logger.error(`scores: Unable to fetch player avatar: ${playerAvatarImage.reason}`);
+        return null;
+    }
+
+    if (playerCountryImage.status == "rejected") {
+        logger.error(`scores: Unable to fetch player country flag: ${playerCountryImage.reason}`);
+        return null;
+    }
 
     //#endregion
 
     //#region background
-    const backgroundImage = songCoverImage.clone({
+    const backgroundImage = songCoverImage.value.clone({
         x: 0, y: -(width - height) / 2,
         width, height: width,
         cornerRadius: 0
@@ -149,7 +167,7 @@ export default async (score: Score) => {
         fill: "rgba(0, 0, 0, 0.4)"
     });
     
-    const headerImage = songCoverImage.clone({
+    const headerImage = songCoverImage.value.clone({
         x: padding, y: padding,
         width: coverSize, height: coverSize,
         cornerRadius: 10
@@ -303,7 +321,7 @@ export default async (score: Score) => {
         cornerRadius: 20
     });
 
-    playerAvatarImage.setAttrs({
+    playerAvatarImage.value.setAttrs({
         x: padding * 2,
         y: height - avatarSize - (padding * 2),
         width: avatarSize,
@@ -311,7 +329,7 @@ export default async (score: Score) => {
         cornerRadius: 10
     } as ImageConfig);
 
-    playerCountryImage.setAttrs({
+    playerCountryImage.value.setAttrs({
         x: avatarSize - (padding * 2),
         y: height - 75 - (padding * 2) + 5,
         width: 75,
@@ -372,7 +390,7 @@ export default async (score: Score) => {
         fontSize: 35
     });
 
-    layer.add(playerRect, playerAvatarImage, playerNameText, playerHMDImage, playerHMDText, playerRankImage, scoreRankText, scoreDateText, playerCountryImage);
+    layer.add(playerRect, playerAvatarImage.value, playerNameText, playerHMDImage, playerHMDText, playerRankImage, scoreRankText, scoreDateText, playerCountryImage.value);
     //#endregion
 
     //#region scores

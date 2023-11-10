@@ -83,3 +83,8 @@ export async function checkPermission(permissions: bigint[], interactionOrChanne
         if (!perms.has(permission)) return permissionMessages.get(permission);
     }
 }
+
+export const PromiseSettled = async <T>(promise: Promise<T>) => {
+    const result = await Promise.allSettled([promise]);
+    return result[0]
+}

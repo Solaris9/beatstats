@@ -18,7 +18,7 @@ export const logger = new Logger("Bot");
 logger.info("Starting...");
 
 cron.schedule("0 0 * * *", async () => {
-    const dir = join(process.cwd(), "cards");
+    const dir = join(process.cwd(), "image-cache", "cards");
     await rmdir(dir);
     await mkdir(dir);
 });
@@ -152,8 +152,12 @@ if (commands.size) {
 // bot initialization
 sequelize.sync()
     .then(async () => {
-        const cardsDir = join(process.cwd(), "cards");
-        if (!await exists(cardsDir)) await mkdir(cardsDir);
+        const images = ["cards", "covers", "avatars", "flags"]
+            .map(i => mkdir(
+                join(process.cwd(), "image-cache", i),
+                { recursive: true }
+            ));
+        await Promise.all(images);
 
         const stats = await Stats.findOne();
         if (!stats) await Stats.create({ id: 0 });

@@ -2,5 +2,5 @@
 config.json
 database.sqlite
 dist/
-cards/
+image-cache/
 node_modules/

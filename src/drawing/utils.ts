@@ -1,7 +1,22 @@
 import Konva from "konva";
+import { join } from "path";
+import { writeFile } from "fs/promises"
 
 export const KonvaImageFromURL = (url: string): Promise<Konva.Image> =>
     new Promise((resolve, reject) => Konva.Image.fromURL(url, resolve, reject))
+
+export const cacheImage = async (url: string, type: string, key: string) => {
+	const path = join(process.cwd(), "image-cache", type, key);
+
+	try {
+		return await KonvaImageFromURL(path);
+	} catch {
+		const image = await KonvaImageFromURL(url);
+		const dataURL = image.toDataURL();
+		await writeFile(path, dataURL.split(",")[1], "base64");
+		return image;
+	}
+}
 
 export function getColour(value: string | number) {
     if (typeof value == "string") {

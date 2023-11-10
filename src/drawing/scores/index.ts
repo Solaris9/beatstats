@@ -1,29 +1,30 @@
 import { AttachmentBuilder } from "discord.js";
 import { Score } from "../../database";
 import { writeFile, readFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
+import { exists } from "../../utils/utils";
 import minimal from "./minimal";
 
 const types = ["minimal"] as const;
 type Types = typeof types[number];
-type Draw = (score: Score) => Promise<string>;
+type Draw = (score: Score) => Promise<string | null>;
 
 const map: Record<Types, Draw> = {
     minimal
 };
 
 export const drawCard = async (type: Types, score: Score) => {
-    const leaderboardPath = `./cards/${score.leaderboardId}`;
+    const leaderboardPath = `./image-cache/cards/${score.leaderboardId}`;
     const cardPath = `${leaderboardPath}/${score.scoreId}.png`;
-    const cardExists = existsSync(cardPath);
+    const cardExists = await exists(cardPath);
 
     let buffer: Buffer;
 
     if (!cardExists) {
         const draw = map[type] ?? minimal;
         const dataUrl = await draw(score);
+        if (dataUrl == null) return null;
         const data = dataUrl.split(",")[1];
-        if (!existsSync(leaderboardPath)) await mkdir(leaderboardPath);
+        if (!await exists(leaderboardPath)) await mkdir(leaderboardPath);
 
         await writeFile(cardPath, data, "base64");
         buffer = Buffer.from(data, "base64");

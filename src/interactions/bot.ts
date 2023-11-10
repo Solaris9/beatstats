@@ -38,6 +38,8 @@ export class BotCommand extends Command {
     }
 
     async stats(interaction: ChatInputCommandInteraction) {
+        await interaction.deferReply();
+
         const stats = await Stats.findOne({ where: { id: 0 }}) as Stats;
         const cachedScores = await Score.count();
         const cachedUsers = await User.count();
@@ -58,7 +60,7 @@ export class BotCommand extends Command {
             .map(([key, value]) => `${key}: ${value}`)
             .join("\n");
 
-        await interaction.reply({
+        await interaction.editReply({
             content: `\`\`\`prolog\n${content}\`\`\``
         })
     }

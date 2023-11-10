@@ -1,4 +1,4 @@
-import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable } from "discord.js";
+import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable, DiscordAPIError } from "discord.js";
 import { ChatInteractionOption, ChatInteractionOptionType, Command } from "../framework.js";
 import { WebSocket } from "ws";
 import { ScoreImprovement, Stats, User, sequelize } from "../database";
@@ -179,6 +179,7 @@ export class ShareScoresCommand extends Command {
     #interactions = {} as Record<string, CommandInteraction>;
 
     async execute(interaction: ChatInputCommandInteraction<CacheType>) {
+        await interaction.deferReply({ ephemeral: true });
         const sub = interaction.options.getSubcommand(true);
         if (sub == "search") return await this.search(interaction);
 
@@ -247,7 +248,7 @@ export class ShareScoresCommand extends Command {
     
         const row = new ActionRowBuilder({ components: [select] });
         
-        await interaction.reply({
+        await interaction.editReply({
             // @ts-ignore
             components: [row],
             ephemeral: true
@@ -458,6 +459,7 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
         if (!options?.isLive) row.addComponents(compareButton);
         
         const file = await drawCard("minimal", score);
+        if (file == null) continue;
 
         const difficulty = getDifficultyName(score.leaderboard.difficulty.difficulty);
         const song = score.leaderboard.difficulty.song.name;
