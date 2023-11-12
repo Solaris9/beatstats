@@ -74,7 +74,7 @@ export const customLeaderboards = async (playerId: string, leaderboard: string) 
     
     for (let i = 0; i < scores.length; i++) {
         let weight = Math.pow(0.965, i);
-        if (i < scores.length) sum += scores[i].leaderboard.stars! * weight;
+        if (i < scores.length) sum += scores[i].leaderboard!.stars! * weight;
         weights += weight;
     }
     

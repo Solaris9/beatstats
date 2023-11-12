@@ -13,7 +13,9 @@ const query = sequelize.getQueryInterface();
 //     defaultValue: 0,
 //     type: DataType.NUMBER
 // });
-query.addColumn("Clans", "leaderboards", {
-    defaultValue: "",
-    type: DataType.STRING
-});
+// query.addColumn("Clans", "leaderboards", {
+//     defaultValue: "",
+//     type: DataType.STRING
+// });
+
+query.removeColumn("Users", "banner")

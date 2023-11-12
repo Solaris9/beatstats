@@ -1,4 +1,4 @@
-import { CacheType, ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
+import { ActionRow, ActionRowBuilder, ButtonBuilder, ButtonStyle, CacheType, ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
 import { ChatInteractionOptionType, Command } from "../framework";
 import { Leaderboard, Score, User } from "../database";
 import { beatleader } from "../api";
@@ -6,6 +6,7 @@ import { EmbedBuilder } from "@discordjs/builders";
 import { trim } from "../utils/utils";
 import { linkDiscordMessage } from "./clan";
 import { CreateUserMethod, createUser } from "../database/models/User";
+import { drawProfile } from "../drawing/profile";
 
 export class RefreshMeCommand extends Command {
     constructor() {
@@ -74,7 +75,7 @@ export class ProfileCommand extends Command {
     }
 
     async execute(interaction: ChatInputCommandInteraction<CacheType>) {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply();
         const option = interaction.options.getUser("user", false);
         const discord = (option ?? interaction.user).id;
 
@@ -91,71 +92,92 @@ export class ProfileCommand extends Command {
             }
         }
 
-        await interaction.editReply("Loading...");
-
-        const scores = await Score.findAll({
-            include: [
-              { model: User, where: { discord } },
-              { model: Leaderboard, where: { type: 3 } }
-            ]
-        });
-        
-        const sum = scores.reduce((a, c) => a + c.pp, 0);
-        const average = (sum / scores.length) || 0;
-
         const profile = await beatleader.player[user.beatleader].get_json();
-        const number = Intl.NumberFormat("en", { maximumFractionDigits: 2 });
 
-        const embed = new EmbedBuilder()
-            .setAuthor({
-                name: profile.name,
-                url: `https://beatleader.xyz/u/${user.beatleader}`,
-            })
-            .setThumbnail(profile.avatar)
-            .addFields([
-                {
-                    name: "Rank:",
-                    value: `#${number.format(profile.rank)} (#${number.format(profile.countryRank)} ${profile.country})`
-                },
-                {
-                    name: "PP:",
-                    inline: true,
-                    value: trim`Total: ${number.format(profile.pp)}pp
-                            Avg: ${number.format(average)}pp
-                            Acc: ${number.format(profile.accPp)}pp
-                            Tech: ${number.format(profile.techPp)}pp
-                            Pass: ${number.format(profile.passPp)}pp`
-                },
-                {
-                    name: "Top PP:",
-                    inline: true,
-                    value: trim`Top: ${number.format(profile.scoreStats.topPp)}pp
-                            Pass: ${number.format(profile.scoreStats.topPassPP)}pp
-                            Acc: ${number.format(profile.scoreStats.topAccPP)}pp
-                            Tech: ${number.format(profile.scoreStats.topTechPP)}pp`
-                },
-                {
-                    name: "Accuracy:",
-                    inline: false,
-                    value: trim`Top: ${number.format(profile.scoreStats.topAccuracy * 100)}%
-                                Avg: ${number.format(profile.scoreStats.averageAccuracy * 100)}%
-                                Avg Ranked: ${number.format(profile.scoreStats.averageRankedAccuracy * 100)}%
-                                Avg Weighted Ranked: ${number.format(profile.scoreStats.averageWeightedRankedAccuracy * 100)}%`
-                },
-                {
-                    name: "Scores:",
-                    inline: true,
-                    value: trim`SS+: ${profile.scoreStats.sspPlays}
-                            SS: ${profile.scoreStats.ssPlays}
-                            S+: ${profile.scoreStats.spPlays}
-                            S: ${profile.scoreStats.sPlays}
-                            A: ${profile.scoreStats.aPlays}`
-                }
-            ]);
+        const file = await drawProfile("minimal", user, profile);
+        if (!file) {
+            await interaction.editReply("Failed to generate image.");
+            return;
+        }
+
+        const profileButton = new ButtonBuilder()
+            .setLabel("View Profile")
+            .setURL(`https://beatleader.xyz/u/${profile.id}`)
+            .setStyle(ButtonStyle.Link)
+
+        const row = new ActionRowBuilder()
+            .addComponents(profileButton)
 
         await interaction.editReply({
-            content: null,
-            embeds: [embed]
+            files: [file],
+            content: "",
+            // @ts-ignore
+            components: [row]
         });
+
+        // const scores = await Score.findAll({
+        //     include: [
+        //       { model: User, where: { discord } },
+        //       { model: Leaderboard, where: { type: 3 } }
+        //     ]
+        // });
+        
+        // const sum = scores.reduce((a, c) => a + c.pp, 0);
+        // const average = (sum / scores.length) || 0;
+
+        // const profile = await beatleader.player[user.beatleader].get_json();
+        // const number = Intl.NumberFormat("en", { maximumFractionDigits: 2 });
+
+        // const embed = new EmbedBuilder()
+        //     .setAuthor({
+        //         name: profile.name,
+        //         url: `https://beatleader.xyz/u/${user.beatleader}`,
+        //     })
+        //     .setThumbnail(profile.avatar)
+        //     .addFields([
+        //         {
+        //             name: "Rank:",
+        //             value: `#${number.format(profile.rank)} (#${number.format(profile.countryRank)} ${profile.country})`
+        //         },
+        //         {
+        //             name: "PP:",
+        //             inline: true,
+        //             value: trim`Total: ${number.format(profile.pp)}pp
+        //                     Avg: ${number.format(average)}pp
+        //                     Acc: ${number.format(profile.accPp)}pp
+        //                     Tech: ${number.format(profile.techPp)}pp
+        //                     Pass: ${number.format(profile.passPp)}pp`
+        //         },
+        //         {
+        //             name: "Top PP:",
+        //             inline: true,
+        //             value: trim`Top: ${number.format(profile.scoreStats.topPp)}pp
+        //                     Pass: ${number.format(profile.scoreStats.topPassPP)}pp
+        //                     Acc: ${number.format(profile.scoreStats.topAccPP)}pp
+        //                     Tech: ${number.format(profile.scoreStats.topTechPP)}pp`
+        //         },
+        //         {
+        //             name: "Accuracy:",
+        //             inline: false,
+        //             value: trim`Top: ${number.format(profile.scoreStats.topAccuracy * 100)}%
+        //                         Avg: ${number.format(profile.scoreStats.averageAccuracy * 100)}%
+        //                         Avg Ranked: ${number.format(profile.scoreStats.averageRankedAccuracy * 100)}%
+        //                         Avg Weighted Ranked: ${number.format(profile.scoreStats.averageWeightedRankedAccuracy * 100)}%`
+        //         },
+        //         {
+        //             name: "Scores:",
+        //             inline: true,
+        //             value: trim`SS+: ${profile.scoreStats.sspPlays}
+        //                     SS: ${profile.scoreStats.ssPlays}
+        //                     S+: ${profile.scoreStats.spPlays}
+        //                     S: ${profile.scoreStats.sPlays}
+        //                     A: ${profile.scoreStats.aPlays}`
+        //         }
+        //     ]);
+
+        // await interaction.editReply({
+        //     content: null,
+        //     embeds: [embed]
+        // });
     }
 }

@@ -41,16 +41,16 @@ export default class Score extends Model {
     @Column declare playCount: number;
 
     @HasOne(() => ScoreImprovement, 'scoreId')
-    declare scoreImprovement: ScoreImprovement;
+    declare scoreImprovement: ScoreImprovement | null;
     
     @HasOne(() => ScoreOffsets, 'scoreId')
-    declare offsets: ScoreOffsets;
+    declare offsets: ScoreOffsets | null;
 
     @BelongsTo(() => Leaderboard, 'leaderboardId')
-    declare leaderboard: Leaderboard;
+    declare leaderboard: Leaderboard | null;
 
     @BelongsTo(() => User, 'playerId')
-    declare user: User;
+    declare user: User | null;
 }
 
 export const createScore = async (s: IScore) => {
@@ -118,7 +118,7 @@ export const createScore = async (s: IScore) => {
             if (e.name !== "SequelizeUniqueConstraintError") throw e;
         });
 
-    if (s.scoreImprovement)
+    if (s.scoreImprovement && s.scoreImprovement.timeset != "")
         await ScoreImprovement.create({
             scoreId: s.id,
 

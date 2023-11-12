@@ -11,7 +11,7 @@ import cron from "node-cron";
 
 // @ts-ignore
 import { TOKEN, PREFIX, ownerId } from "../config.json";
-import { checkPermission, exists } from "./utils/utils.js";
+import { checkPermission } from "./utils/utils.js";
 import Stats from "./database/models/Stats.js";
 
 export const logger = new Logger("Bot");
@@ -48,8 +48,12 @@ cron.schedule("0 0 * * 0", async () => {
 });
 
 const path = join(process.cwd(), "assets", "fonts");
-// registerFont(join(path, "NotoSans-Regular.ttf"), { family: "NotoSans" });
-registerFont(join(path, "SF-Compact-Text-Regular.ttf"), { family: "SF-Compact" });
+registerFont(join(path, "SF-Compact-Text-Regular.ttf"), {
+    family: "SF-Compact", weight: "regular"
+});
+registerFont(join(path, "SF-Compact-Text-Bold.ttf"), {
+    family: "SF-Compact", weight: "bold"
+});
 
 const client = new Client({
     intents: [
@@ -152,7 +156,7 @@ if (commands.size) {
 // bot initialization
 sequelize.sync()
     .then(async () => {
-        const images = ["cards", "covers", "avatars", "flags"]
+        const images = ["cards", "covers", "banners", "avatars", "flags"]
             .map(i => mkdir(
                 join(process.cwd(), "image-cache", i),
                 { recursive: true }

@@ -1,4 +1,4 @@
-import { HMDs, KonvaImageFromURL, ModifiersList, cacheImage, centerText, getColour, truncate } from "../utils";
+import { HMDs, KonvaImageFromURL, ModifiersList, cacheImage, centerText, getColour, shortDate, truncate } from "../utils";
 import Konva from "konva";
 import { Image, ImageConfig } from "konva/lib/shapes/Image";
 import { RectConfig } from "konva/lib/shapes/Rect";
@@ -9,9 +9,7 @@ import { Score } from "../../database";
 import { getDifficultyName } from "../../database/models/SongDifficulty.js";
 import { LeaderboardType } from "../../database/models/Leaderboard.js";
 import { Modifiers } from "../../database/models/Score.js";
-import { Logger } from "../../utils/logger";
-
-const logger = new Logger("Drawing")
+import { logger } from "../utils";
 
 //#region extra
 
@@ -34,6 +32,7 @@ const GlobeIconRaw = readFileSync(join(path, "Globe.png"), "base64");
 
 export default async (score: Score) => {
     //#region constants
+    score.leaderboard = score.leaderboard!;
 
     const songName = score.leaderboard.difficulty.song.name;
     const songAuthor = score.leaderboard.difficulty.song.author;
@@ -50,12 +49,16 @@ export default async (score: Score) => {
     const minutes = Math.floor(duration / 60);
     const songDuration = `${minutes}:${(duration - (minutes * 60)).toString().padStart(2, "0")}`;
 
-    const playerName = score.user.name;
-    const playerAvatar = score.user.avatar;
+    const playerName = score.user!.name;
+    const playerAvatar = score.user!.avatar;
     const playerHmd = HMDs[score.hmd] ?? HMDs[0];
-    const playerCountry = "https://flagsapi.com/" + score.user.country + "/flat/64.png";
+    const playerCountry = "https://flagsapi.com/" + score.user!.country + "/flat/64.png";
 
-    const scoreDate = new Date(score.timeSet.getTime() * 1000).toDateString();
+    let scoreDate = shortDate(score.timeSet);
+    if (score.scoreImprovement && score.scoreImprovement.score != 0) {
+        scoreDate += ` vs ${shortDate(score.scoreImprovement.timeSet)}`
+    }
+
     const scoreScore = score.baseScore != score.modifiedScore ? score.modifiedScore : score.baseScore;
     const scorePoints = `${score.pp.toFixed(2)}pp`;
     const scoreAccuracy = `${(score.accuracy * 100).toFixed(2)}%`;
@@ -115,7 +118,7 @@ export default async (score: Score) => {
     ] = await Promise.allSettled([
         cacheImage(songCover, "covers", basename(songCover)),
         cacheImage(playerAvatar, "avatars", basename(playerAvatar)),
-        cacheImage(playerCountry, "flags", `${score.user.country}.png`)
+        cacheImage(playerCountry, "flags", `${score.user!.country}.png`)
     ]);
 
     if (songCoverImage.status == "rejected") {
@@ -395,7 +398,7 @@ export default async (score: Score) => {
 
     //#region scores
 
-    const isScoreImprovement = score.scoreImprovement && (score.scoreImprovement.score != 0 || score.scoreImprovement   .pp != 0);
+    const isScoreImprovement = score.scoreImprovement && (score.scoreImprovement.score != 0 || score.scoreImprovement.pp != 0);
 
     if (isScoreImprovement) {
         topScoreConfig.y! -= 20;
@@ -432,7 +435,7 @@ export default async (score: Score) => {
     }
 
     if (score.leaderboard.type != LeaderboardType.Unranked) {
-        const ppChange = isScoreImprovement && score.scoreImprovement.pp > 0 ? "+" : "";
+        const ppChange = isScoreImprovement && score.scoreImprovement!.pp > 0 ? "+" : "";
 
         layer.add(
             ppRect,
@@ -441,7 +444,7 @@ export default async (score: Score) => {
 
         if (isScoreImprovement)
             layer.add(
-                centerText(`${ppChange}${score.scoreImprovement.pp.toFixed(2)}pp`, 35, {
+                centerText(`${ppChange}${score.scoreImprovement!.pp.toFixed(2)}pp`, 35, {
                     ...topOpts,
                     x: leftCol,
                     y: topScoreConfig.y! + 45
@@ -456,7 +459,7 @@ export default async (score: Score) => {
         centerText(format(scoreScore), 40, { ...topOpts, x: rightCol })
     );
 
-    if (isScoreImprovement) {
+    if (isScoreImprovement && score.scoreImprovement) {
         const accImprovement = (score.scoreImprovement.accuracy * 100).toFixed(2);
         const accChange = score.scoreImprovement.accuracy > 0 ? "+" : "";
         const scoreChange = score.scoreImprovement.score > 0 ? "+" : "";
@@ -515,7 +518,7 @@ export default async (score: Score) => {
     let middleColImproveWidth = 0;
     let rightColImproveWidth = 0;
 
-    if (isScoreImprovement) {
+    if (isScoreImprovement && score.scoreImprovement) {
         const leftAccImprovement = ` ${score.scoreImprovement.accLeft > 0 ? "+" : ""}${score.scoreImprovement.accLeft.toFixed(2)}`;
         const rightAccImprovement = ` ${score.scoreImprovement.accRight > 0 ? "+" : ""}${score.scoreImprovement.accRight.toFixed(2)}`;
 

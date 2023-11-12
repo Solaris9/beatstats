@@ -1,22 +1,42 @@
 import Konva from "konva";
 import { join } from "path";
 import { writeFile } from "fs/promises"
+import { Logger } from "../utils/logger";
+import { Image } from "konva/lib/shapes/Image";
+import sharp from "sharp";
+import { loadImage } from "canvas";
+
+export const logger = new Logger("Drawing");
 
 export const KonvaImageFromURL = (url: string): Promise<Konva.Image> =>
-    new Promise((resolve, reject) => Konva.Image.fromURL(url, resolve, reject))
+	new Promise((resolve, reject) => Konva.Image.fromURL(url, resolve, reject));
 
-export const cacheImage = async (url: string, type: string, key: string) => {
-	const path = join(process.cwd(), "image-cache", type, key);
+export const cacheImage = async (
+	url: string | null,
+	type: string,
+	key: string
+): Promise<Image> => {
+	// @ts-ignore
+	if (!url) return null;
+
+	const path = join(process.cwd(), "image-cache", type, key.replace(".webp", ".png"));
 
 	try {
 		return await KonvaImageFromURL(path);
 	} catch {
+		if (url.endsWith(".webp")) {
+			const res = await fetch(url);
+			const arrayBuffer = await res.arrayBuffer();
+			const buffer = await sharp(arrayBuffer).toFormat("png").toBuffer();
+			url = `data:base64,${buffer.toString("base64")}`;
+		}
+
 		const image = await KonvaImageFromURL(url);
 		const dataURL = image.toDataURL();
 		await writeFile(path, dataURL.split(",")[1], "base64");
 		return image;
 	}
-}
+};
 
 export function getColour(value: string | number) {
     if (typeof value == "string") {
@@ -60,6 +80,19 @@ export function centerText(
     return text;
 }
 
+export const shortDate = (date: Date) => {
+	return new Date(date.getTime() * 1000).toDateString().slice(4);
+}
+
+export function hexToRgb(hex: string) {
+	var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+	return result ? {
+	  r: parseInt(result[1], 16),
+	  g: parseInt(result[2], 16),
+	  b: parseInt(result[3], 16)
+	} : null;
+  }
+
 export function truncate(text: Konva.Text, content: string, remaining: number) {
     let size = text.measureSize(content);
 
@@ -77,6 +110,10 @@ export function truncate(text: Konva.Text, content: string, remaining: number) {
     text.setText(content);
 
     return size;
+}
+
+export function capitalize(text: string) {
+	return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 type HMD = {

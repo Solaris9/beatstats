@@ -261,9 +261,8 @@ export class ShareScoresCommand extends Command {
         const options = ["name", "mapper", "author"];
         const hasAny = options.find(o => interaction.options.getString(o, false))
         if (!hasAny) {
-            await interaction.reply({
+            await interaction.editReply({
                 content: "Please add either a `name`, `mapper` or `author` argument to the command.",
-                ephemeral: true
             });
 
             return;
@@ -313,20 +312,15 @@ export class ShareScoresCommand extends Command {
         });
 
         if (!results.length) {
-            await interaction.reply({
+            await interaction.editReply({
                 content: "No scores found with that query.",
-                ephemeral: true
             });
             
             return;
         }
 
         if (results.length == 1) {
-            await interaction.reply({
-                content: "Sending...",
-                ephemeral: true
-            });
-
+            await interaction.editReply("Sending...");
             await sendScoreCard([results[0].scoreId], interaction.channel as GuildTextBasedChannel);
             return;
         }
@@ -354,10 +348,9 @@ export class ShareScoresCommand extends Command {
     
         const row = new ActionRowBuilder({ components: [select] });
         
-        await interaction.reply({
+        await interaction.editReply({
             // @ts-ignore
             components: [row],
-            ephemeral: true
         });
 
         this.#interactions[interaction.user.id] = interaction;
@@ -423,7 +416,7 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
 
     if (!scores.length) return;
 
-    const user = scores[0].user;
+    const user = scores[0].user!;
     if (!user.name) {
         const profile = await beatleader.player[user.beatleader].get_json();
     
@@ -461,12 +454,12 @@ async function sendScoreCard(scoreIds: number[], channel: GuildTextBasedChannel,
         const file = await drawCard("minimal", score);
         if (file == null) continue;
 
-        const difficulty = getDifficultyName(score.leaderboard.difficulty.difficulty);
-        const song = score.leaderboard.difficulty.song.name;
+        const difficulty = getDifficultyName(score.leaderboard!.difficulty.difficulty);
+        const song = score.leaderboard!.difficulty.song.name;
         const timeSet = score.timeSet.getTime();
     
         const inGuild = user.discord ? await channel.client.users.fetch(user.discord).catch(() => null) : null;
-        const prefix = inGuild ? `<@${score.user.discord}>` : score.user.name;
+        const prefix = inGuild ? `<@${score.user!.discord}>` : score.user!.name;
 
         const content = options?.isLive ?
             `${prefix} set a new ${difficulty} score on ${song} <t:${timeSet}:R>!` :
@@ -1112,7 +1105,7 @@ export class PlaylistCommand extends Command {
             ]
         });
 
-        const leaderboards = [...new Set(scores.map(s => s.leaderboard))];
+        const leaderboards = [...new Set(scores.map(s => s.leaderboard!))];
         const intl = new Intl.ListFormat("en", { style: "long" });
 
         const file = PlaylistUtils.build(leaderboards, name, user);

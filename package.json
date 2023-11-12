@@ -11,7 +11,6 @@
   "dependencies": {
     "@types/better-sqlite3": "^7.6.4",
     "canvas": "^2.11.2",
-    "d3-scale": "^4.0.2",
     "discord.js": "^14.11.0",
     "glob": "^10.2.6",
     "jszip": "^3.10.1",
@@ -21,6 +20,7 @@
     "rss-to-json": "^2.1.1",
     "sequelize": "^6.31.1",
     "sequelize-typescript": "^2.1.5",
+    "sharp": "^0.32.6",
     "sqlite3": "^5.1.6",
     "ts-node": "^10.9.1"
   },
