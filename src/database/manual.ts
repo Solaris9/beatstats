@@ -158,41 +158,6 @@ export class Query {
     // }
 }
 
-//#region sql templating
-// function sql(template: TemplateStringsArray, ...strings: unknown[]) {
-//     return template.reduce((a, c, i) => {
-//         const arg = strings[i];
-
-//         if (Array.isArray(arg)) return a + c + arg.join(", ");
-//         else if (arg) return a + c + arg;
-//         else return a + c;
-//     }, "").trim();
-// }
-
-// sql.as = function (model: Model<unknown>) {
-//     return `${model._name} AS ${fixTable(model._name)}`;
-// }
-
-// let q = sql`
-// SELECT ${[
-//     _Score.scoreId, _Score.accuracy, _Score.pp, _Score.timeSet,
-//     _Leaderboard.type,
-//     Difficulty.difficulty,
-//     Song.name, Song.mapper
-// ]}
-// FROM ${sql.as(Score)}
-// JOIN ${sql.as(User)} ON 
-// ${User.beatleader} = ${_Score.playerId}
-// AND ${User.discord} = '289232137570222083'
-// JOIN ${sql.as(Leaderboard)} ON
-// ${_Leaderboard.leaderboardId} = ${_Score.leaderboardId}
-// JOIN ${sql.as(Difficulty)} ON
-// ${Difficulty.leaderboardId} = ${_Leaderboard.leaderboardId}
-// JOIN ${sql.as(Song)} ON
-// ${Song.key} = ${Difficulty.key}
-// `;
-//#endregion
-
 export const _User = model("User", {
     beatleader: "string",
     discord: "string"
@@ -224,3 +189,38 @@ export const _Song = model("Song", {
     mapper: "string",
     author: "string"
 });
+
+//#region sql templating
+// function sql(template: TemplateStringsArray, ...strings: unknown[]) {
+//     return template.reduce((a, c, i) => {
+//         const arg = strings[i];
+
+//         if (Array.isArray(arg)) return a + c + arg.join(", ");
+//         else if (arg) return a + c + arg;
+//         else return a + c;
+//     }, "").trim();
+// }
+
+// sql.as = function(model: any) {
+//     return `${model._name} AS ${fixTable(model._name)}`;
+// }
+
+// let q = sql`
+// SELECT ${[
+//     _Score.scoreId, _Score.accuracy, _Score.pp, _Score.timeSet,
+//     _Leaderboard.type,
+//     _Difficulty.difficulty,
+//     _Song.name, _Song.mapper
+// ]}
+// FROM ${sql.as(_Score)}
+// JOIN ${sql.as(_User)} ON 
+// ${_User.beatleader} = ${_Score.playerId}
+// AND ${_User.discord} = '289232137570222083'
+// JOIN ${sql.as(_Leaderboard)} ON
+// ${_Leaderboard.leaderboardId} = ${_Score.leaderboardId}
+// JOIN ${sql.as(_Difficulty)} ON
+// ${_Difficulty.leaderboardId} = ${_Leaderboard.leaderboardId}
+// JOIN ${sql.as(_Song)} ON
+// ${_Song.key} = ${_Difficulty.key}
+// `;
+//#endregion

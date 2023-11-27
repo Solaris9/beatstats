@@ -9,6 +9,8 @@ export default class Difficulty extends Model {
     
     @PrimaryKey
     @Column declare difficulty: number;
+
+    @PrimaryKey
     @Column declare mode: number;
     
     @Column declare leaderboardId: string;
@@ -58,6 +60,7 @@ export const createSongDifficulty = async (leaderboard: ILeaderboard) => {
         where: {
             key: leaderboard.song.id,
             difficulty: leaderboard.difficulty.value,
+            mode: leaderboard.difficulty.mode,
         }
     });
 

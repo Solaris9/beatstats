@@ -11,6 +11,7 @@ import Song, { createSong } from "./models/Song.js";
 import User from "./models/User.js";
 import Clan from "./models/Clan.js";
 import Stats from "./models/Stats.js";
+import { Op } from 'sequelize';
 
 export {
     Stats,

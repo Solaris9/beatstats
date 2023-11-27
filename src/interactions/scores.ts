@@ -193,9 +193,8 @@ export class ShareScoresCommand extends Command {
             user = await createUser(CreateUserMethod.Discord, discord);
 
             if (!user) {
-                await interaction.reply({
+                await interaction.editReply({
                     content: linkDiscordMessage,
-                    ephemeral: true
                 });
 
                 return;
@@ -221,8 +220,10 @@ export class ShareScoresCommand extends Command {
     
             let description = timeAgo(Number(score.timeset));
             if (score.leaderboard.difficulty.status == LeaderboardType.Ranked) {
-                description += ` - ${score.pp}pp - ${(score.accuracy * 100).toFixed(2)}%`;
+                description += ` - ${score.pp}pp`;
             }
+
+            description += ` - ${(score.accuracy * 100).toFixed(2)}%`;
 
             const difficultyText = `[${difficultyName}]`;
             let songText = score.leaderboard.song.name;

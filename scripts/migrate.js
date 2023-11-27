@@ -1,5 +1,6 @@
-const { Op } = require("sequelize");
+const { Op, DataTypes } = require("sequelize");
 const { DataType } = require("sequelize-typescript");
+const { SongDifficulty, Song } = require("../dist/database");
 
 const sequelize = require("../dist/database").sequelize;
 const query = sequelize.getQueryInterface();
@@ -18,4 +19,9 @@ const query = sequelize.getQueryInterface();
 //     type: DataType.STRING
 // });
 
-query.removeColumn("Users", "banner")
+// (async () => {
+//     await sequelize.query('CREATE TABLE IF NOT EXISTS `Difficulties_new` (`key` VARCHAR(255) NOT NULL REFERENCES `Songs` (`key`) ON DELETE CASCADE ON UPDATE CASCADE, `difficulty` INTEGER NOT NULL, `mode` INTEGER, `leaderboardId` VARCHAR(255) REFERENCES `Leaderboards` (`leaderboardId`) ON DELETE CASCADE ON UPDATE CASCADE, `njs` INTEGER, `nps` INTEGER, `notes` INTEGER, `bombs` INTEGER, `walls` INTEGER, `maxScore` INTEGER,  PRIMARY KEY (`key`, `difficulty`, `mode`));');
+//     await sequelize.query('INSERT INTO `Difficulties_new` SELECT * FROM `Difficulties`');
+//     await sequelize.query('DROP TABLE `Difficulties`');
+//     await sequelize.query('ALTER TABLE `Difficulties_new` RENAME TO `Difficulties`');
+// })();

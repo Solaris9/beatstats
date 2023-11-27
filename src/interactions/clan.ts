@@ -75,7 +75,7 @@ export class ClanCommands extends Command {
                         description: desc,
                         type: ChatInteractionOptionType.BOOLEAN,
                     }))
-                },
+                }
             ]
         })
     }
