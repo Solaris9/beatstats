@@ -1,13 +1,12 @@
-// @ts-ignore
-import { CacheType, ChatInputCommandInteraction, Client, EmbedBuilder, GuildTextBasedChannel, PermissionFlagsBits} from "discord.js";
-import { ChatInteractionOptionChoice, ChatInteractionOptionType, Command } from "../framework";
+import { ChatInputCommandInteraction, EmbedBuilder, GuildTextBasedChannel, PermissionFlagsBits} from "discord.js";
 import { User } from "../database";
 import { Logger } from "../utils/logger";
 import Clan from "../database/models/Clan";
 import { Op } from "sequelize";
 import { CreateUserMethod, createUser } from "../database/models/User";
-import { leaderboardFunction, leaderboardKV, leaderboardVK, leaderboards } from "./leaderboards";
+import { leaderboardFunction, leaderboardVK, leaderboards } from "./leaderboards";
 import { checkPermission } from "../utils/utils";
+import { Arg, ChoiceValueObject, Choices, Command, SubCommand, parseParams } from "../framework";
 
 export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
 
@@ -26,60 +25,8 @@ const channelTypes = [
 
 type ChannelTypes = typeof channelTypes[number]["value"]
 
-export class ClanCommands extends Command {
-    constructor() {
-        super({
-            name: "clan",
-            description: "Manage your clan link.",
-            options: [
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "refresh",
-                    description: "Refresh the clan data."
-                },
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "setup",
-                    description: "Setup your clan to work with the bot."
-                },
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "info",
-                    description: "Shows info about the clan."
-                },
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "channel",
-                    description: "Configure a channel to work with the bot feature.",
-                    options: [
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "type",
-                            description: "The type of channel to configure.",
-                            required: true,
-                            choices: channelTypes as unknown as ChatInteractionOptionChoice[]
-                        },
-                        {
-                            type: ChatInteractionOptionType.CHANNEL,
-                            name: "channel",
-                            description: "Set a channel or omit to remove it."
-                        }
-                    ]
-                },
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "leaderboards",
-                    description: "Enable or disable a leaderboard from showing.",
-                    options: Object.entries(leaderboards).map(([key, desc]) => ({
-                        name: leaderboardKV[key],
-                        description: desc,
-                        type: ChatInteractionOptionType.BOOLEAN,
-                    }))
-                }
-            ]
-        })
-    }
-
+@Command("clan", "Manage your clan.")
+export class ClanCommands {
     async _checkClan(interaction: ChatInputCommandInteraction) {
         const clan = await Clan.findOne({
             where: {
@@ -112,16 +59,8 @@ export class ClanCommands extends Command {
         return user;
     }
 
-    async execute(interaction: ChatInputCommandInteraction<CacheType>) {
-        const sub = interaction.options.getSubcommand();
 
-        if (sub == "refresh") this.refresh(interaction);
-        else if (sub == "setup") this.setup(interaction);
-        else if (sub == "channel") this.channel(interaction);
-        else if (sub == "info") this.info(interaction);
-        else if (sub == "leaderboards") this.leaderboards(interaction);
-    }
-
+    @SubCommand("Setup your clan to work with the bot.")
     async setup(interaction: ChatInputCommandInteraction) {        
         const discord = interaction.user.id;
 
@@ -186,6 +125,7 @@ export class ClanCommands extends Command {
         }
     }
 
+    @SubCommand("Refresh the clan data.")
     async refresh(interaction: ChatInputCommandInteraction) {
         const clan = await this._checkClan(interaction)
         if (!clan) return;
@@ -201,17 +141,20 @@ export class ClanCommands extends Command {
         await interaction.editReply("Refreshed clan!");
     }
 
-    async channel(interaction: ChatInputCommandInteraction) {
+    @SubCommand("Configure a channel to work with the bot feature.")
+    async channel(
+        interaction: ChatInputCommandInteraction,
+        @Choices(channelTypes as unknown as ChoiceValueObject)
+        @Arg("The type of channel to configure.", Arg.Type.STRING) type: ChannelTypes,
+        @Arg("Set a channel or omit to remove it.", Arg.Type.CHANNEL) channel: GuildTextBasedChannel | null
+    ) {
         const clan = await this._checkClan(interaction)
         if (!clan) return;
 
         const user = await this._checkOwner(clan, interaction);
         if (!user) return;
 
-        const type = interaction.options.getString("type", true) as ChannelTypes;
         const { name } = channelTypes.find(t => t.value == type)!;
-
-        const channel = interaction.options.getChannel("channel", false) as GuildTextBasedChannel;
 
         if (channel == null) {
             await interaction.reply({
@@ -253,6 +196,7 @@ export class ClanCommands extends Command {
         });
     }
 
+    @SubCommand("Shows info about the clan.")
     async info(interaction: ChatInputCommandInteraction) {
         const clan = await this._checkClan(interaction);
         if (!clan) return;
@@ -298,7 +242,22 @@ export class ClanCommands extends Command {
         });
     }
 
-    async leaderboards(interaction: ChatInputCommandInteraction) {
+    @SubCommand("Enable or disable a leaderboard from showing.")
+    async leaderboards(
+        interaction: ChatInputCommandInteraction,
+        @Arg("Total PP", Arg.Type.BOOLEAN) total_pp: boolean | null,
+        @Arg("Pass PP", Arg.Type.BOOLEAN) pass_pp: boolean | null,
+        @Arg("Accuracy PP", Arg.Type.BOOLEAN) accuracy_pp: boolean | null,
+        @Arg("Tech PP", Arg.Type.BOOLEAN) tech_pp: boolean | null,
+        @Arg("Top PP", Arg.Type.BOOLEAN) top_pp: boolean | null,
+        @Arg("Ranked Accuracy", Arg.Type.BOOLEAN) ranked_accuracy: boolean | null,
+        @Arg("Weighted Ranked Accuracy", Arg.Type.BOOLEAN) weighted_ranked_accuracy: boolean | null,
+        @Arg("Weighted Stars for 99%", Arg.Type.BOOLEAN) weighted_stars_average_99: boolean | null,
+        @Arg("Weighted Stars for 98%", Arg.Type.BOOLEAN) weighted_stars_average_98: boolean | null,
+        @Arg("Weighted Stars for 97%", Arg.Type.BOOLEAN) weighted_stars_average_97: boolean | null,
+        @Arg("Weighted Stars for 96%", Arg.Type.BOOLEAN) weighted_stars_average_96: boolean | null,
+        @Arg("Weighted Stars for 95%", Arg.Type.BOOLEAN) weighted_stars_average_95: boolean | null
+    ) {        
         const clan = await this._checkClan(interaction)
         if (!clan) return;
 
@@ -307,11 +266,12 @@ export class ClanCommands extends Command {
 
         await interaction.deferReply({ ephemeral: true });
 
-        const lbs = Object.keys(leaderboardVK)
-            .map(k => [k, interaction.options.getBoolean(k, false)])
-            .filter(([, o]) => o != null) as [string, boolean][];
-        
         const clanLbs = clan.leaderboards.split(",").filter(l => !!l);
+        
+        const _args = Array.from(arguments)
+        const lbs = parseParams(this.leaderboards)
+            .map((p, i) => [p[0].replace(/_/g, '-'), _args[i + 1]])
+            .filter(([, o]) => o != null) as [string, boolean][];
         
         for (let [name, bool] of lbs) {
             const contains = clanLbs.includes(name);
@@ -326,10 +286,15 @@ export class ClanCommands extends Command {
 
         clan.leaderboards = clanLbs.join(",");
         await clan.save();
+
+        if (!clanLbs.length) {
+            await interaction.editReply("Updated leaderboards list, no leaderboards to display.");
+
+            return;
+        }
         
-        await interaction.editReply(
-            `Updated leaderboards list, now displaying:\n\`${clanLbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``
-        );
+        const list = clanLbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `");
+        await interaction.editReply(`Updated leaderboards list, now displaying:\n\`${list}\``);
 
         if (clan.leaderboards != "") await leaderboardFunction(interaction.client);
     }

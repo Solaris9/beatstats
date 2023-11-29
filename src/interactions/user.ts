@@ -1,30 +1,17 @@
-import { ActionRow, ActionRowBuilder, ButtonBuilder, ButtonStyle, CacheType, ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
-import { ChatInteractionOptionType, Command } from "../framework";
-import { Leaderboard, Score, User } from "../database";
+import Discord, { ActionRowBuilder, ButtonBuilder, ButtonStyle, CacheType, ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
+import { User } from "../database";
 import { beatleader } from "../api";
-import { EmbedBuilder } from "@discordjs/builders";
-import { trim } from "../utils/utils";
 import { linkDiscordMessage } from "./clan";
 import { CreateUserMethod, createUser } from "../database/models/User";
 import { drawProfile } from "../drawing/profile";
+import { Arg, Command } from "../framework";
 
-export class RefreshMeCommand extends Command {
-    constructor() {
-        super({
-            name: "refresh",
-            description: "Refresh your profile to where it was last cached.",
-            options: [
-                {
-                    type: ChatInteractionOptionType.BOOLEAN,
-                    name: "full",
-                    description: "Sync all scores from your profile.",
-                    required: false
-                }
-            ]
-        });
-    }
-
-    async execute(interaction: ChatInputCommandInteraction<CacheType>): Promise<void> {
+@Command("refresh", "Refresh your profile to where it was last cached.")
+export class RefreshMeCommand {
+    async execute(
+        interaction: ChatInputCommandInteraction,
+        @Arg("Sync all of your scores from your profile.", Arg.Type.BOOLEAN) full: boolean | null
+    ) {
         let user = await User.findOne({ where: { discord: interaction.user.id } });
         if (!user) {
             user = await createUser(CreateUserMethod.Discord, interaction.user.id);
@@ -51,39 +38,20 @@ export class RefreshMeCommand extends Command {
     }
 }
 
-export class ProfileCommand extends Command {
-    constructor() {
-        super({
-            name: "profile",
-            description: "Show your BeatLeader profile information.",
-            options: [
-                {
-                    type: ChatInteractionOptionType.USER,
-                    name: "user",
-                    description: "A user to view their profile."
-                }
-            ]
-        },
-        {
-            permissions: [
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.SendMessagesInThreads,
-                PermissionFlagsBits.AttachFiles,
-                PermissionFlagsBits.ViewChannel
-            ]
-        });
-    }
-
-    async execute(interaction: ChatInputCommandInteraction<CacheType>) {
+@Command("profile", "Show your BeatLeader profile information.")
+export class ProfileCommand {
+    async execute(
+        interaction: ChatInputCommandInteraction,
+        @Arg("A user to view their profile.", Arg.Type.USER)
+        user: Discord.User | null = interaction.user
+    ) {
         await interaction.deferReply();
-        const option = interaction.options.getUser("user", false);
-        const discord = (option ?? interaction.user).id;
 
-        let user = await User.findOne({ where: { discord } });
-        if (!user) {
-            user = await createUser(CreateUserMethod.Discord, discord);
+        let player = await User.findOne({ where: { discord: user!.id } });
+        if (!player) {
+            player = await createUser(CreateUserMethod.Discord, user!.id);
 
-            if (!user) {
+            if (!player) {
                 await interaction.editReply({
                     content: linkDiscordMessage,
                 });
@@ -92,9 +60,9 @@ export class ProfileCommand extends Command {
             }
         }
 
-        const profile = await beatleader.player[user.beatleader].get_json();
+        const profile = await beatleader.player[player.beatleader].get_json();
 
-        const file = await drawProfile("minimal", user, profile);
+        const file = await drawProfile("minimal", player, profile);
         if (!file) {
             await interaction.editReply("Failed to generate image.");
             return;

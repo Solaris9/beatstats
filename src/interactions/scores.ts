@@ -1,5 +1,4 @@
-import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, TextBasedChannel, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, CacheType, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable, DiscordAPIError } from "discord.js";
-import { ChatInteractionOption, ChatInteractionOptionType, Command } from "../framework.js";
+import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable } from "discord.js";
 import { WebSocket } from "ws";
 import { ScoreImprovement, Stats, User, sequelize } from "../database";
 import { drawCard } from "../drawing/scores/index";
@@ -19,6 +18,7 @@ import { Query, _Difficulty, _Leaderboard, _Score, _Song, _User } from "../datab
 import Clan from "../database/models/Clan";
 import { CreateUserMethod, createUser } from "../database/models/User.js";
 import { linkDiscordMessage } from "./clan.js";
+import { Arg, Bounds, Choices, SubCommand, Command, ChoiceValueTuple, createStringSelect } from "../framework.js";
 
 const logger = new Logger("Live-Scores");
 
@@ -93,107 +93,171 @@ export const onceReady = async (client: Client) => {
     connectLiveScores();
 };
 
-const contexts = [
-    {
-        name: "No Mods",
-        value: "4"
-    },
-    {
-        name: "No Pause",
-        value: "8"
-    },
-    {
-        name: "Golf",
-        value: "16"
-    }
-];
+const contexts: ChoiceValueTuple = [
+    ["No Mods", "4"],
+    ["No Pause", "8"],
+    ["Golf", "16"]
+]
 
-export class ShareScoresCommand extends Command {
-    constructor() {
-        const context: ChatInteractionOption = {
-            type: ChatInteractionOptionType.STRING,
-            name: "context",
-            description: "The leaderboard context to use. Default: General ",
-            choices: contexts
-        };
-
-        const options = [
-            context,
-            {
-                type: ChatInteractionOptionType.USER,
-                name: "user",
-                description: "A user to share their scores."
-            }
-        ];
-
-        super({
-            name: "share",
-            description: "Share your scores!",
-            options: [
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "recent",
-                    description: "Share your recent scores!",
-                    options
-                },
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "top",
-                    description: "Share your top scores!",
-                    options
-                },
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "search",
-                    description: "Share a score by searching!",
-                    options: [
-                        context,
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "name",
-                            description: "The name search query."
-                        },
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "mapper",
-                            description: "The mapper search query."
-                        },
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "author",
-                            description: "The author search query."
-                        }
-                    ]
-                }
-            ]
-        }, {
-            permissions: [
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.AttachFiles,
-                PermissionFlagsBits.ViewChannel
-            ]
-        });
-    }
-
+@Command("share", "Share your scores!")
+export class ShareScoresCommand {
     #scores = {} as Record<string, IScore[]>;
     #interactions = {} as Record<string, CommandInteraction>;
+    
+    @SubCommand("Share a score by searching!")
+    async search(
+        int: ChatInputCommandInteraction,
+        @Choices(contexts)
+        @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null,
 
-    async execute(interaction: ChatInputCommandInteraction<CacheType>) {
-        await interaction.deferReply({ ephemeral: true });
-        const sub = interaction.options.getSubcommand(true);
-        if (sub == "search") return await this.search(interaction);
+        @Arg("The name search query.", Arg.Type.STRING) name: string | null,
+        @Arg("The mapper search query.", Arg.Type.STRING) mapper: string | null,
+        @Arg("The author search query.", Arg.Type.STRING) author: string | null,
+    ) {
+        await int.deferReply({ ephemeral: true });
 
-        const int = this.#interactions[interaction.user.id];
-        try { await int.deleteReply() } catch { }
+        const options = ["name", "mapper", "author"];
+        const values = { name, mapper, author };
+        const hasAny = options.find(o => values[o]);
+        
+        if (!hasAny) {
+            await int.editReply("Please add either a `name`, `mapper` or `author` argument to the command.");
+            return;
+        }
 
-        const discord = (interaction.options.getUser("user", false) ?? interaction.user).id;
+        const query = new Query()
+            .select(_Score.scoreId, _Score.accuracy, _Score.pp, _Score.timeSet)
+            .select(_Leaderboard.type)
+            .select(_Difficulty.difficulty)
+            .select(_Song.name, _Song.mapper)
+            .from(_Score)
+            .join(_User)
+            .where(_User.beatleader, "=", _Score.playerId)
+            .where(_User.discord, "=", int.user.id)
+            .join(_Leaderboard)
+            .where(_Leaderboard.leaderboardId, "=", _Score.leaderboardId)
+            .join(_Difficulty)
+            .where(_Difficulty.leaderboardId, "=", _Leaderboard.leaderboardId)
+            .join(_Song)
+            .where(_Song.key, "=", _Difficulty.key);
+
+        let replacements = {} as Record<string, string>;
+
+        for (let option of options) {
+            const value = int.options.getString(option, false);
+            if (value != null) {
+                query.where(_Song[option], "LIKE", Query.param(option));
+                replacements[option] = `%${value}%`;
+            }
+        }
+
+        query.limit(25);
+
+        type Result = {
+            scoreId: number,
+            accuracy: number,
+            pp: number,
+            timeSet: string;
+            type: number,
+            difficulty: number,
+            name: string
+        };
+       
+        const results: Result[] = await sequelize.query(query.build(), {
+            replacements,
+            type: QueryTypes.SELECT
+        });
+
+        if (!results.length) {
+            await int.editReply({
+                content: "No scores found with that query.",
+            });
+            
+            return;
+        }
+
+        if (results.length == 1) {
+            await int.editReply("Sending...");
+            await sendScoreCard([results[0].scoreId], int.channel as GuildTextBasedChannel);
+            return;
+        }
+
+        const selectScores = results.map(row => {
+            const difficulty = getDifficultyName(row.difficulty);
+            const date = new Date(row.timeSet);
+
+            let description = timeAgo(date.getTime());
+            if (row.type == LeaderboardType.Ranked) description += ` - ${row.pp}pp`;
+            description += ` - ${(row.accuracy * 100).toFixed(2)}%`;
+            
+            return new StringSelectMenuOptionBuilder({
+                label: `[${difficulty}] ${row.name}`,
+                value: row.scoreId.toString(),
+                description
+            });
+        });
+
+        const select = createStringSelect(ShareScoresCommand)
+            .setPlaceholder("Select up to 3 scores to share.")
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions(selectScores);
+    
+        const row = new ActionRowBuilder({ components: [select] });
+        
+        await int.editReply({
+            // @ts-ignore
+            components: [row],
+        });
+
+        this.#interactions[int.user.id] = int;
+    }
+
+    @SubCommand("Share your recent scores!")
+    async recent(
+        int: ChatInputCommandInteraction,
+        @Arg("A user to share their scores.", Arg.Type.USER) user: User | null,
+        @Choices(contexts)
+        @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null
+    ) {
+        const sortBy = "date";
+        const leaderboardContext = context ?? "2";
+        
+        this.topAndRecent(int, leaderboardContext, sortBy, user);
+    }
+
+    @SubCommand("Share your top scores!")
+    async top(
+        int: ChatInputCommandInteraction,
+        @Arg("A user to share their scores.", Arg.Type.USER) user: User | null,
+        @Choices(contexts)
+        @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null
+    ) {
+        const sortBy = "pp";
+        const leaderboardContext = context ?? "2";
+
+        this.topAndRecent(int, leaderboardContext, sortBy, user);
+    }
+
+    async topAndRecent(
+        int: ChatInputCommandInteraction,
+        leaderboardContext: string,
+        sortBy: string,
+        mentioned: User | null,
+    ) {
+        await int.deferReply({ ephemeral: true });
+
+        const old = this.#interactions[int.user.id];
+        try { await old.deleteReply() } catch { }
+
+        const discord = (mentioned ?? int.user).id;
         let user = await User.findOne({ where: { discord } });
         
         if (!user) {
             user = await createUser(CreateUserMethod.Discord, discord);
 
             if (!user) {
-                await interaction.editReply({
+                await int.editReply({
                     content: linkDiscordMessage,
                 });
 
@@ -201,9 +265,6 @@ export class ShareScoresCommand extends Command {
             }
         }
     
-        const leaderboardContext = interaction.options.getString("context", false) ?? "2";
-        const sortBy = sub == "recent" ? "date" : "pp";
-
         const json = await beatleader.player[user.beatleader].scores.get_json({
             query: {
                 sortBy,
@@ -212,7 +273,7 @@ export class ShareScoresCommand extends Command {
             }
         });
 
-        this.#scores[interaction.user.id] = json.data;
+        this.#scores[int.user.id] = json.data;
 
         const selectScores = json.data.map(score => {
             const difficulty = score.leaderboard.difficulty;
@@ -241,7 +302,7 @@ export class ShareScoresCommand extends Command {
             });
         });
     
-        const select = this.createStringSelect("regular")
+        const select = createStringSelect(ShareScoresCommand, "regular")
             .setPlaceholder("Select up to 3 scores to share.")
             .setMinValues(1)
             .setMaxValues(3)
@@ -249,115 +310,16 @@ export class ShareScoresCommand extends Command {
     
         const row = new ActionRowBuilder({ components: [select] });
         
-        await interaction.editReply({
+        await int.editReply({
             // @ts-ignore
             components: [row],
             ephemeral: true
         });
 
-        this.#interactions[interaction.user.id] = interaction;
+        this.#interactions[int.user.id] = int;
     }
 
-    async search(interaction: ChatInputCommandInteraction) {
-        const options = ["name", "mapper", "author"];
-        const hasAny = options.find(o => interaction.options.getString(o, false))
-        if (!hasAny) {
-            await interaction.editReply({
-                content: "Please add either a `name`, `mapper` or `author` argument to the command.",
-            });
-
-            return;
-        }
-
-        const discord = (interaction.options.getUser("user", false) ?? interaction.user).id;
-
-        const query = new Query()
-            .select(_Score.scoreId, _Score.accuracy, _Score.pp, _Score.timeSet)
-            .select(_Leaderboard.type)
-            .select(_Difficulty.difficulty)
-            .select(_Song.name, _Song.mapper)
-            .from(_Score)
-            .join(_User)
-            .where(_User.beatleader, "=", _Score.playerId)
-            .where(_User.discord, "=", discord)
-            .join(_Leaderboard)
-            .where(_Leaderboard.leaderboardId, "=", _Score.leaderboardId)
-            .join(_Difficulty)
-            .where(_Difficulty.leaderboardId, "=", _Leaderboard.leaderboardId)
-            .join(_Song)
-            .where(_Song.key, "=", _Difficulty.key);
-
-        let replacements = {} as Record<string, string>;
-
-        for (let option of options) {
-            const value = interaction.options.getString(option, false);
-            if (value != null) {
-                query.where(_Song[option], "LIKE", Query.param(option));
-                replacements[option] = `%${value}%`;
-            }
-        }
-
-        type Result = {
-            scoreId: number,
-            accuracy: number,
-            pp: number,
-            timeSet: string;
-            type: number,
-            difficulty: number,
-            name: string
-        };
-       
-        const results: Result[] = await sequelize.query(query.build(), {
-            replacements,
-            type: QueryTypes.SELECT
-        });
-
-        if (!results.length) {
-            await interaction.editReply({
-                content: "No scores found with that query.",
-            });
-            
-            return;
-        }
-
-        if (results.length == 1) {
-            await interaction.editReply("Sending...");
-            await sendScoreCard([results[0].scoreId], interaction.channel as GuildTextBasedChannel);
-            return;
-        }
-
-        const selectScores = results.map(row => {
-            const difficulty = getDifficultyName(row.difficulty);
-            const date = new Date(row.timeSet);
-
-            let description = timeAgo(date.getTime());
-            if (row.type == LeaderboardType.Ranked) description += ` - ${row.pp}pp`;
-            description += ` - ${(row.accuracy * 100).toFixed(2)}%`;
-            
-            return new StringSelectMenuOptionBuilder({
-                label: `[${difficulty}] ${row.name}`,
-                value: row.scoreId.toString(),
-                description
-            });
-        });
-
-        const select = this.createStringSelect()
-            .setPlaceholder("Select up to 3 scores to share.")
-            .setMinValues(1)
-            .setMaxValues(1)
-            .addOptions(selectScores);
-    
-        const row = new ActionRowBuilder({ components: [select] });
-        
-        await interaction.editReply({
-            // @ts-ignore
-            components: [row],
-        });
-
-        this.#interactions[interaction.user.id] = interaction;
-    }
-
-    async onStringSelect(interaction: StringSelectMenuInteraction<CacheType>) {
+    async onStringSelect(interaction: StringSelectMenuInteraction) {
         const ids = interaction.values.map(Number);
 
         if (interaction.customId.endsWith("regular")) {
@@ -569,205 +531,8 @@ export const onInteractionCreate = async (client: Client, interaction: Interacti
     }
 }
 
-export class PlaylistCommand extends Command {
-    constructor() {
-        super({
-            name: "playlist",
-            description: "Generate a playlist",
-            options: [
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "scores",
-                    description: "Generate a playlist of your scores with a query.",
-                    options: [
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "name",
-                            description: "The name of this playlist.",
-                            required: true
-                        },
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "type",
-                            description: "Filter to ranked or unranked scores, defaults to all.",
-                            choices: [
-                                {
-                                    name: "Ranked",
-                                    value: "3"
-                                },
-                                {
-                                    name: "Unranked",
-                                    value: "0"
-                                }
-                            ]
-                        },
-                        //#region acc
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "min-acc",
-                            description: "The minimum accuracy",
-                            min_value: 0.0,
-                            max_value: 100.0
-                        },
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "max-acc",
-                            description: "The maximum accuracy",
-                            min_value: 0.0,
-                            max_value: 100.0
-                        },
-                        //#endregion acc
-                        //#region pp
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "min-pp",
-                            description: "The minimum pp",
-                            min_value: 0.0
-                        },
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "max-pp",
-                            description: "The maximum pp",
-                            min_value: 0.0
-                        },
-                        //#endregion
-                    ]
-                },
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "potential",
-                    description: "Generate a playlist of maps for potential scores.",
-                    options: [
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            name: "all",
-                            description: "Whether to use all leaderboards",
-                            required: true
-                        },
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "pp",
-                            description: "The PP target to achieve",
-                            required: true
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            name: "comparison",
-                            description: "Shows the increase needed, only works with all:False",
-                        },
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "direction",
-                            description: "The direction to sort",
-                            choices: [
-                                {
-                                    name: "High -> Low",
-                                    value: ">"
-                                },
-                                {
-                                    name: "Low -> High",
-                                    value: "<"
-                                }
-                            ]
-                        },
-                        {
-                            type: ChatInteractionOptionType.STRING,
-                            name: "sort",
-                            description: "The order to sort the scores",
-                            choices: [
-                                {
-                                    name: "Accuracy",
-                                    value: "acc"
-                                },
-                                {
-                                    name: "Stars",
-                                    value: "stars"
-                                },
-                                {
-                                    name: "Increase",
-                                    value: "increase"
-                                }
-                            ]
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            name: "modified-stars",
-                            description: "Whether to filter using modified stars.",
-                        },
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "min-acc",
-                            description: "The minimum accuracy set.",
-                        },
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "max-acc",
-                            description: "The maximum accuracy set.",
-                        },
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "min-stars",
-                            description: "The minimum stars set.",
-                        },
-                        {
-                            type: ChatInteractionOptionType.DOUBLE,
-                            name: "max-stars",
-                            description: "The maximum stars set.",
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            name: "sf",
-                            description: "Include Super Fast modifier",
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            description: "Include Faster Song modifier",
-                            name: "fs"
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            description: "Include Ghost Notes modifier",
-                            name: "gn"
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            description: "Include No Bombs modifier",
-                            name: "nb"
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            description: "Include No Walls modifier",
-                            name: "no"
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            description: "Include Slower Song modifier",
-                            name: "ss"
-                        },
-                        {
-                            type: ChatInteractionOptionType.BOOLEAN,
-                            description: "Include No Arrows modifier",
-                            name: "na"
-                        }
-                    ]
-                }
-            ]
-        }, {
-            permissions: [
-                PermissionFlagsBits.SendMessages,
-                PermissionFlagsBits.SendMessagesInThreads,
-                PermissionFlagsBits.AttachFiles,
-                PermissionFlagsBits.ViewChannel
-            ]
-        });
-    }
-
-    async execute(interaction: ChatInputCommandInteraction<CacheType>) {
-        const cmd = interaction.options.getSubcommand(true);
-        if (cmd == "scores") this.userScores(interaction);
-        else this.potentialScores(interaction);
-    }
-
+@Command("playlist", "Generate a playlist")
+export class PlaylistCommand {
     curve = [
         [1.0, 7.424],
         [0.999, 6.241],
@@ -817,38 +582,64 @@ export class PlaylistCommand extends Command {
         return this.inflate(passPP + accPP + techPP) / 52;
     }
 
-    async potentialScores(interaction: ChatInputCommandInteraction) {
-        await interaction.deferReply();
-        const user = await User.findOne({ where: { discord: interaction.user.id } });
+    @SubCommand("Generate a playlist of maps for potential scores.")
+    async potential(
+        int: ChatInputCommandInteraction,
 
-        const all = interaction.options.getBoolean("all", true);
-        const pp = interaction.options.getNumber("pp", true);
-        const comparison = interaction.options.getBoolean("comparison", false);
-        const sort = interaction.options.getString("sort", false);
-        const direction = interaction.options.getString("direction", false);
-        const modifiedStars = interaction.options.getBoolean("modified-stars", false);
+        @Arg("Whether to use all leaderboards") all: boolean,
+        @Arg("The PP target to achieve", Arg.Type.DOUBLE) pp: number,
+    
+        @Arg("Shows the increase needed, only works with all:False", Arg.Type.BOOLEAN)
+        comparison: boolean | undefined,
 
-        const minAcc = interaction.options.getNumber("min-acc", false);
-        const maxAcc = interaction.options.getNumber("max-acc", false);
+        @Choices([
+            ["High -> Low", ">"],
+            ["Low -> High", "<"],
+        ])
+        @Arg("Shows the increase needed, only works with all:False", Arg.Type.STRING)
+        direction: string | null,
 
-        const minStars = interaction.options.getNumber("min-stars", false);
-        const maxStars = interaction.options.getNumber("max-stars", false);
+        @Choices([
+            ["Accuracy", "acc"],
+            ["Stars", "stars"],
+            ["Increase", "increase"],
+        ])
+        @Arg("The order to sort the scores", Arg.Type.STRING) sort: string | null,
 
-        const sf = interaction.options.getBoolean("sf", false);
-        const fs = interaction.options.getBoolean("fs", false);
-        const ss = interaction.options.getBoolean("ss", false);
-        const gn = interaction.options.getBoolean("gn", false);
-        const nb = interaction.options.getBoolean("nb", false);
-        const no = interaction.options.getBoolean("no", false);
-        const na = interaction.options.getBoolean("na", false);
+        @Arg("Whether to filter using modified stars", Arg.Type.BOOLEAN) modified_stars: boolean | null,
+        
+        @Bounds({ min: 0, max: 100 })
+        @Arg("The minimum accuracy set", Arg.Type.DOUBLE)
+        min_acc: number | null,
+        
+        @Bounds({ min: 0, max: 100 })
+        @Arg("The maximum accuracy set", Arg.Type.DOUBLE)
+        max_acc: number | null,
+        
+        @Bounds({ min: 0 })
+        @Arg("The minimum stars set", Arg.Type.DOUBLE)
+        min_stars: number | null = 0,
+        
+        @Bounds({ min: 0 })
+        @Arg("The maximum stars set", Arg.Type.DOUBLE)
+        max_stars: number | null = 100,
+
+        @Arg("Include Super Fast Song modifier", Arg.Type.BOOLEAN) sf: boolean | null,
+        @Arg("Include Faster Song modifier", Arg.Type.BOOLEAN) fs: boolean | null,
+        @Arg("Include Slower Song modifier", Arg.Type.BOOLEAN) ss: boolean | null,
+        @Arg("Include Ghost Notes modifier", Arg.Type.BOOLEAN) gn: boolean | null,
+        @Arg("Include No Bombs modifier", Arg.Type.BOOLEAN) nb: boolean | null,
+        @Arg("Include No Walls modifier", Arg.Type.BOOLEAN) no: boolean | null,
+        @Arg("Include No Arrows modifier", Arg.Type.BOOLEAN) na: boolean | null,
+    ) {
+        await int.deferReply();
+        const user = await User.findOne({ where: { discord: int.user.id } });
 
         const mods: string[] = [];
 
-        if (sf || fs || ss) {
-            if (sf) mods.push("SF");
-            else if (fs) mods.push("FS");
-            else mods.push("SS");
-        }
+        if (sf) mods.push("SF");
+        else if (fs) mods.push("FS");
+        else if (ss) mods.push("SS");
 
         if (gn) mods.push("GN");
         if (na) mods.push("NA");
@@ -884,10 +675,18 @@ export class PlaylistCommand extends Command {
             include.push(opts);
         };
 
-        const leaderboards = await Leaderboard.findAll({
-            where: { type: LeaderboardType.Ranked },
-            include
-        });
+        const where: WhereOptions = {
+            type: LeaderboardType.Ranked
+        };
+
+        if (!modified_stars) {
+            where.stars = {
+                [Op.gte]: min_stars,
+                [Op.lte]: max_stars,
+            }
+        }
+
+        const leaderboards = await Leaderboard.findAll({ where, include });
 
         type PotentialLeaderboard = {
             leaderboard: Leaderboard,
@@ -897,12 +696,6 @@ export class PlaylistCommand extends Command {
         };
 
         let scores = leaderboards
-            .filter(l => {
-                if (modifiedStars) return true;
-
-                return (minStars && l.stars! > minStars) ||
-                    (maxStars && l.stars! < maxStars)
-            })
             .map(l => {
                 let acc: number = 0;
                 let multiplier = 1;
@@ -952,7 +745,7 @@ export class PlaylistCommand extends Command {
                     }
                 }
 
-                if ((maxAcc && (maxAcc / 100) < acc) || (minAcc && (minAcc / 100) > acc)) acc = 0;
+                if ((max_acc && (max_acc / 100) < acc) || (min_acc && (min_acc / 100) > acc)) acc = 0;
                 if (acc > 1) acc = 0;
 
                 const res = {
@@ -962,16 +755,20 @@ export class PlaylistCommand extends Command {
                     stars: this.getStars(passRating, accRating, techRating)
                 }
 
-                if (modifiedStars && (
-                    (minStars && res.stars! < minStars) ||
-                    (maxStars && res.stars! > maxStars)
+                if (modified_stars && (
+                    (res.stars! < min_stars!) ||
+                    (res.stars! > max_stars!)
                 )) return null;
 
                 return res;
             })
-            .filter(s => s != null && s.requiredAcc && s.leaderboard.difficulty)
-            .sort((a, b) => a!.requiredAcc - b!.requiredAcc) as PotentialLeaderboard[];
-        
+            .filter(s => s != null && s.requiredAcc && s.leaderboard.difficulty) as PotentialLeaderboard[];
+
+        if (scores.length == 0) {
+            await int.editReply("0 leaderboards found with that criteria, please try again with a different parameter.",);
+            return;
+        }
+    
         if (sort) scores.sort((a, b) => {
             if (direction == "<") {
                 let temp = a;
@@ -984,11 +781,6 @@ export class PlaylistCommand extends Command {
             else return (b.requiredAcc - b.currentAcc) - (a.requiredAcc - a.currentAcc);
         });
 
-        if (scores.length == 0) {
-            await interaction.editReply("0 leaderboards found with that criteria, please try again with a different parameter.",);
-            return;
-        }
-        
         const maps = scores.map(s => [
             s.requiredAcc.toFixed(4),
             comparison ? `+${(s.requiredAcc - s.currentAcc).toFixed(4)}%` : null,
@@ -1009,21 +801,39 @@ export class PlaylistCommand extends Command {
         const content = [`leaderboards each worth ${pp}pp`];
         if (mods.length) content.push(`with ${mods.join("/")}`);
 
-        if (minAcc) content.push(`higher than ${minAcc}%`);
-        if (maxAcc) content.push(`lower than ${maxAcc}%`);
+        if (min_acc) content.push(`higher than ${min_acc}%`);
+        if (max_acc) content.push(`lower than ${max_acc}%`);
 
-        if (minStars) content.push(`higher than ${minStars}\\*`);
-        if (maxStars) content.push(`lower than ${maxStars}\\*`);
+        if (min_stars != 0) content.push(`higher than ${min_stars}\\*`);
+        if (max_stars != 100) content.push(`lower than ${max_stars}\\*`);
 
         const intl = new Intl.ListFormat("en", { style: "long" });
 
-        await interaction.editReply({
+        await int.editReply({
             content: [lbs.length, content.length ? intl.format(content) : ""].join(" "),
             files: [text, playlist]
         });
     }
 
-    async userScores(interaction: ChatInputCommandInteraction) {
+    @SubCommand("Generate a playlist of your scores with a query.")
+    async scores(
+        interaction: ChatInputCommandInteraction,
+        @Arg("The name of the playlist.") name: string,
+        @Choices([
+            ["Ranked", "3"],
+            ["Unranked", "0"]
+        ])
+        @Arg("Filter to ranked or unranked scores, defaults to all.", Arg.Type.STRING) type: string | null,
+
+        @Bounds({ min: 0.0, max: 100.0 })
+        @Arg("The minimum accuracy.", Arg.Type.DOUBLE) min_acc: number | null,
+        @Bounds({ min: 0.0, max: 100.0 })
+        @Arg("The maximum accuracy.", Arg.Type.DOUBLE) max_acc: number | null,
+        @Bounds({ min: 0.0 })
+        @Arg("The minimum pp.", Arg.Type.DOUBLE) min_pp: number | null,
+        @Bounds({ min: 0.0 })
+        @Arg("The maximum pp.", Arg.Type.DOUBLE) max_pp: number | null,
+    ) {
         const option = interaction.options.getUser("user", false);
         const discord = (option ?? interaction.user).id;
 
@@ -1047,9 +857,6 @@ export class PlaylistCommand extends Command {
 
         const where: WhereOptions = {};
         const opts = interaction.options;
-
-        const name = opts.getString("name", true);
-        const type = opts.getString("type");
         
         const status = !type ? "" : type == "3" ? "ranked" : "unranked";
 
@@ -1115,4 +922,4 @@ export class PlaylistCommand extends Command {
             files: [file]
         });
     }
-}
+};

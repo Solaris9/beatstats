@@ -1,4 +1,4 @@
-import { Client, Events, IntentsBitField, Interaction, Partials, User } from "discord.js";
+import { Client, Events, IntentsBitField, Partials, User } from "discord.js";
 import { Leaderboard, createLeaderboard, createSong, createSongDifficulty, sequelize } from "./database/index.js";
 import ModifierRatings, { createModifierRating } from "./database/models/LeaderboardModifierRatings.js";
 import ModifierValues, { createModifierValues } from "./database/models/LeaderboardModifierValues.js";
@@ -7,6 +7,7 @@ import { rmdir, mkdir } from "fs/promises";
 import { join } from "path";
 import { Logger } from "./utils/logger.js";
 import load from "./framework.js";
+// import load from "./framework.js";
 import cron from "node-cron";
 
 // @ts-ignore
@@ -87,8 +88,8 @@ if (interactions.size) {
             if (interaction.isChatInputCommand()) {
                 const command = interactions.get(interaction.commandName);
                 if (command) {
-                    if (command.config?.permissions) {
-                        const missing = await checkPermission(command.config.permissions, interaction);
+                    if (command.__custom.permissions) {
+                        const missing = await checkPermission(command.__custom.permissions, interaction);
                         
                         if (missing) {
                             await interaction.reply({
@@ -100,7 +101,7 @@ if (interactions.size) {
                         }
                     }
 
-                    if (command.config?.dev && interaction.user.id != ownerId) {
+                    if (command.__custom?.dev && interaction.user.id != ownerId) {
                         await interaction.reply({
                             ephemeral: true,
                             content: "You do not have permission to run this command."
@@ -108,17 +109,17 @@ if (interactions.size) {
                         return;
                     }
 
-                    await command.execute!(interaction);
+                    await command.__handle(interaction);                    
                 }
             }
 
             if (interaction.isStringSelectMenu()) {
-                const command = interactions.find(i => interaction.customId.startsWith(i.options.name));
+                const command = interactions.find(i => interaction.customId.startsWith(i.__data.name));
                 if (command) command.onStringSelect!(interaction);
             }
 
             if (interaction.isButton()) {
-                const command = interactions.find(i => interaction.customId.startsWith(i.options.name));
+                const command = interactions.find(i => interaction.customId.startsWith(i.__data.name));
                 if (command) await command.onButtonClick!(interaction);
             }
         } catch (err: any) {

@@ -118,6 +118,11 @@ export class Query {
         return this;
     }
 
+    limit(value: number): Omit<Query, "select" | "from" | "where"> {
+        this.query.push(["limit", `${value}`]);
+        return this;
+    }
+
     build() {
         let statements = ["SELECT"];
 
@@ -134,6 +139,8 @@ export class Query {
                 statements.push(currentValue + ",");
             } else if (previousName == "where" && currentName == "where") {
                 statements.push(`AND ${currentValue}`);
+            } else if (previousName == "where" && currentName == "limit") {
+                statements.push(`LIMIT ${currentValue}`);
             } else {
                 statements.push(currentValue);
             }

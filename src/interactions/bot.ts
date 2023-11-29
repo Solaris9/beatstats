@@ -1,42 +1,35 @@
-import { ChatInputCommandInteraction, CacheType } from "discord.js";
-import { ChatInteractionOptionType, Command } from "../framework";
+import { ChatInputCommandInteraction } from "discord.js";
 import { Score, Stats, User } from "../database";
+import { Arg, Command, SubCommand } from "../framework";
 
-export class InviteCommand extends Command {
-    constructor() {
-        super({
-            name: "invite",
-            description: "Sends the invite link for the bot."
-        });
-    }
+// declare module "../test.js" {
+//     interface CustomOptions {
+//         developer?: boolean;
+//     }
+// }
 
-    async execute(interaction: ChatInputCommandInteraction<CacheType>) {
+// @c("invite", "Sends the invite link to the bot.")
+// export class botCommand {
+//     @Custom({ developer: true, disabled: true })
+//     async execute(
+//         int: ChatInputCommandInteraction,
+//     ) {
+//         await int.reply("Test")
+//     }
+// }
+
+@Command("invite", "Sends the invite for the bot.")
+export class InviteCommand {
+    async execute(interaction: ChatInputCommandInteraction) {
         await interaction.reply({
             content: "Click on this link to invite the bot!\n<https://discord.com/api/oauth2/authorize?client_id=1156310849439400047&scope=bot>"
         });
     }
 }
 
-export class BotCommand extends Command {
-    constructor() {
-        super({
-            name: "bot",
-            description: "Shows information about the bot.",
-            options: [
-                {
-                    type: ChatInteractionOptionType.SUB_COMMAND,
-                    name: "stats",
-                    description: "Shows stats about the bot."
-                }
-            ]
-        });
-    }
-
-    async execute(interaction: ChatInputCommandInteraction<CacheType>) {
-        const sub = interaction.options.getSubcommand();
-        if (sub == "stats") this.stats(interaction);
-    }
-
+@Command("bot", "Shows information about the bot.")
+export class BotCommand {
+    @SubCommand("Shows stats about the bot.")
     async stats(interaction: ChatInputCommandInteraction) {
         await interaction.deferReply();
 

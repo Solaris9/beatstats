@@ -1,6 +1,7 @@
 const { TOKEN, applicationId } = require("../../config.json");
 const { REST, Routes } = require("discord.js");
 const { join } = require("path");
+const { inspect } = require("util");
 
 (async () => {
     require(join(process.cwd(), "dist/database/index"));
@@ -11,6 +12,11 @@ const { join } = require("path");
         type: 1,
         ...v.options
     }));
+
+    if (process.argv.includes("test")) {
+        console.log(inspect(commands, { depth: 10 }));
+        return;
+    }
 
     await rest.put(
         Routes.applicationCommands(applicationId),
