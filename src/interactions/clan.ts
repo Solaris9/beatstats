@@ -52,7 +52,7 @@ export class ClanCommands extends BaseCommand {
 
     @SubCommand("Setup your clan to work with the bot.")
     async setup(ctx: CommandContext) {
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const player = await ctx.user();
         if (!player) return;
@@ -95,7 +95,7 @@ export class ClanCommands extends BaseCommand {
 
     @SubCommand("Refresh the clan data.")
     async refresh(ctx: CommandContext) {
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const player = await ctx.user();
         if (!player) return;
@@ -117,7 +117,7 @@ export class ClanCommands extends BaseCommand {
         @Arg("The type of channel to configure.", Arg.Type.STRING) type: ChannelTypes,
         @Arg("Set a channel or omit to remove it.", Arg.Type.CHANNEL) channel: GuildTextBasedChannel | null
     ) {
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const player = await ctx.user();
         if (!player) return;
@@ -161,7 +161,7 @@ export class ClanCommands extends BaseCommand {
 
     @SubCommand("Shows info about the clan.")
     async info(ctx: CommandContext) {
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const clan = await this._checkClan(ctx.interaction);
         if (!clan) return;
@@ -220,7 +220,7 @@ export class ClanCommands extends BaseCommand {
         @Arg("Weighted Stars for 96%", Arg.Type.BOOLEAN) weighted_stars_average_96: boolean | null,
         @Arg("Weighted Stars for 95%", Arg.Type.BOOLEAN) weighted_stars_average_95: boolean | null
     ) {        
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const player = await ctx.user();
         if (!player) return;

@@ -39,7 +39,6 @@ export class BaseCommand implements Omit<CommandInstance, "__handle" | "onString
     
 }
 
-
 export enum ChatInteractionOptionType {
     SUB_COMMAND = 1,
     SUB_COMMAND_GROUP,
@@ -438,6 +437,10 @@ export class CommandContext {
 
             return player;
         }
+    }
+
+    defer(ephemeral: boolean = false) {
+        return this.interaction.deferReply({ ephemeral });
     }
 
     edit: ChatInputCommandInteraction["editReply"] = (options: any) =>

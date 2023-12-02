@@ -10,7 +10,7 @@ export class RefreshMeCommand extends BaseCommand {
         @Arg("Force sync all of your scores from your profile.", Arg.Type.BOOLEAN)
         force: boolean | null
     ) {
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const player = await ctx.user();
         if (!player) return;
@@ -28,7 +28,7 @@ export class ProfileCommand {
         @Arg("A user to view their profile.", Arg.Type.USER)
         user: Discord.User | null = ctx.interaction.user
     ) {
-        await ctx.interaction.deferReply();
+        await ctx.defer();
 
         const player = await ctx.user(user?.id);
         if (!player) return;

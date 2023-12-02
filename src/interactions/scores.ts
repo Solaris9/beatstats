@@ -113,7 +113,7 @@ export class ShareScoresCommand {
         @Arg("The mapper search query.", Arg.Type.STRING) mapper: string | null,
         @Arg("The author search query.", Arg.Type.STRING) author: string | null,
     ) {
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const player = await ctx.user();
         if (!player) return;
@@ -123,7 +123,7 @@ export class ShareScoresCommand {
         const hasAny = options.find(o => values[o]);
         
         if (!hasAny) {
-            await ctx.interaction.editReply("Please add either a `name`, `mapper` or `author` argument to the command.");
+            await ctx.edit("Please add either a `name`, `mapper` or `author` argument to the command.");
             return;
         }
 
@@ -171,7 +171,7 @@ export class ShareScoresCommand {
         });
 
         if (!results.length) {
-            await ctx.interaction.editReply({
+            await ctx.edit({
                 content: "No scores found with that query.",
             });
             
@@ -179,7 +179,7 @@ export class ShareScoresCommand {
         }
 
         if (results.length == 1) {
-            await ctx.interaction.editReply("Sending...");
+            await ctx.edit("Sending...");
             await sendScoreCard([results[0].scoreId], ctx.interaction.channel as GuildTextBasedChannel);
             return;
         }
@@ -207,7 +207,7 @@ export class ShareScoresCommand {
     
         const row = new ActionRowBuilder({ components: [select] });
         
-        await ctx.interaction.editReply({
+        await ctx.edit({
             // @ts-ignore
             components: [row],
         });
@@ -224,8 +224,8 @@ export class ShareScoresCommand {
         @Choices(contexts)
         @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null
     ) {
-        await ctx.interaction.deferReply({ ephemeral: true });
-
+        await ctx.defer(true);
+        
         const player = await ctx.user(user!.id);
         if (!player) return;
 
@@ -244,7 +244,7 @@ export class ShareScoresCommand {
         @Choices(contexts)
         @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null
     ) {
-        await ctx.interaction.deferReply({ ephemeral: true });
+        await ctx.defer(true);
 
         const player = await ctx.user(user!.id);
         if (!player) return;
@@ -309,7 +309,7 @@ export class ShareScoresCommand {
     
         const row = new ActionRowBuilder({ components: [select] });
         
-        await ctx.interaction.editReply({
+        await ctx.edit({
             // @ts-ignore
             components: [row],
             ephemeral: true
@@ -631,11 +631,12 @@ export class PlaylistCommand {
         @Arg("Include No Walls modifier", Arg.Type.BOOLEAN) no: boolean | null,
         @Arg("Include No Arrows modifier", Arg.Type.BOOLEAN) na: boolean | null,
     ) {
-        await ctx.interaction.deferReply();
+        await ctx.defer();
+
         const player = await ctx.user(false);
         
         if (all && !player) {
-            await ctx.interaction.editReply(`Unable to use \`all\` option without a Discord linked.\n${linkDiscordMessage}`);
+            await ctx.edit(`Unable to use \`all\` option without a Discord linked.\n${linkDiscordMessage}`);
             return;
         }
 
@@ -769,7 +770,7 @@ export class PlaylistCommand {
             .filter(s => s != null && s.requiredAcc && s.leaderboard.difficulty) as PotentialLeaderboard[];
 
         if (scores.length == 0) {
-            await ctx.interaction.editReply("0 leaderboards found with that criteria, please try again with a different parameter.",);
+            await ctx.edit("0 leaderboards found with that criteria, please try again with a different parameter.",);
             return;
         }
     
@@ -813,7 +814,7 @@ export class PlaylistCommand {
 
         const intl = new Intl.ListFormat("en", { style: "long" });
 
-        await ctx.interaction.editReply({
+        await ctx.edit({
             content: [lbs.length, content.length ? intl.format(content) : ""].join(" "),
             files: [text, playlist]
         });
@@ -838,7 +839,7 @@ export class PlaylistCommand {
         @Bounds({ min: 0.0 })
         @Arg("The maximum pp.", Arg.Type.DOUBLE) max_pp: number | null,
     ) {
-        await ctx.interaction.deferReply();
+        await ctx.defer();
 
         const player = await ctx.user();
         if (!player) return;
@@ -852,12 +853,12 @@ export class PlaylistCommand {
         const pp = [min_pp, max_pp];
 
         if (acc[0] != null && acc[1] != null && acc[0] > acc[1]) {
-            await ctx.interaction.editReply("Minimum accuracy cannot be higher than maximum accuracy.");
+            await ctx.edit("Minimum accuracy cannot be higher than maximum accuracy.");
             return;
         }
 
         if (pp[0] != null && pp[1] != null && pp[0] > pp[1]) {
-            await ctx.interaction.editReply("Minimum pp cannot be higher than maximum pp.");
+            await ctx.edit("Minimum pp cannot be higher than maximum pp.");
             return;
         }
 
@@ -905,7 +906,7 @@ export class PlaylistCommand {
         const intl = new Intl.ListFormat("en", { style: "long" });
 
         const file = PlaylistUtils.build(leaderboards, name, player);
-        await ctx.interaction.editReply({
+        await ctx.edit({
             content: [leaderboards.length, status, `leaderboards`, content.length ? intl.format(content) : ""].join(" "),
             files: [file]
         });
