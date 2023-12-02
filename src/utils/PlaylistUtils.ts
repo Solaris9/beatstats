@@ -15,7 +15,7 @@ export type PlaylistSong = {
 };
 
 export default {
-    build(leaderboards: Leaderboard[], name: string, user: User | null) {
+    build(leaderboards: Leaderboard[], name: string, user?: User) {
         const songs = [] as PlaylistSong[];
 
         for (let leaderboard of leaderboards) {

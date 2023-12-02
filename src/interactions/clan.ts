@@ -3,12 +3,10 @@ import { User } from "../database";
 import { Logger } from "../utils/logger";
 import Clan from "../database/models/Clan";
 import { Op } from "sequelize";
-import { CreateUserMethod, createUser } from "../database/models/User";
 import { leaderboardFunction, leaderboardVK, leaderboards } from "./leaderboards";
 import { checkPermission } from "../utils/utils";
-import { Arg, ChoiceValueObject, Choices, Command, SubCommand, parseParams } from "../framework";
-
-export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
+import { Arg, BaseCommand, ChoiceValueObject, Choices, Command, CommandContext, SubCommand, linkDiscordMessage, parseParams } from "../framework";
+import { RefreshMeCommand } from "./user";
 
 export const logger = new Logger("Clan");
 
@@ -26,7 +24,7 @@ const channelTypes = [
 type ChannelTypes = typeof channelTypes[number]["value"]
 
 @Command("clan", "Manage your clan.")
-export class ClanCommands {
+export class ClanCommands extends BaseCommand {
     async _checkClan(interaction: ChatInputCommandInteraction) {
         const clan = await Clan.findOne({
             where: {
@@ -35,132 +33,104 @@ export class ClanCommands {
         });
         
         if (!clan) {
-            await interaction.reply({
-                ephemeral: true,
-                content: "Please run `/clan setup` first."
-            });
-
+            await interaction.reply(`Please run ${ClanCommands.mention("setup")} first.`);
             return false;
         }
 
         return clan;
     }
 
-    async _checkOwner(clan: Clan, interaction: ChatInputCommandInteraction) {
-        const user = await User.find(interaction.user.id);
-        if (clan.owner != user?.beatleader) {
-            await interaction.reply({
-                ephemeral: true,
-                content: "You are not the clan owner."
-            });
+    async _checkOwner(clan: Clan, player: User, interaction: ChatInputCommandInteraction) {
+        if (clan.owner != player.beatleader) {
+            await interaction.reply("You are not the clan owner.");
             return false;
         }
 
-        return user;
+        return true;
     }
 
 
     @SubCommand("Setup your clan to work with the bot.")
-    async setup(interaction: ChatInputCommandInteraction) {        
-        const discord = interaction.user.id;
+    async setup(ctx: CommandContext) {
+        await ctx.interaction.deferReply({ ephemeral: true });
 
-        let user = await User.findOne({ where: { discord } });
-        if (!user) {
-            user = await createUser(CreateUserMethod.Discord, discord);
-            
-            if (!user) {
-                await interaction.reply({
-                    ephemeral: true,
-                    content: linkDiscordMessage
-                });
+        const player = await ctx.user();
+        if (!player) return;
 
-                return;
-            }
-        }
-
-        if (discord != interaction.guild?.ownerId) {
-            await interaction.reply({
-                content: "This command requires the guild's owner to run it.",
-                ephemeral: true
-            });
-
+        if (player.discord != ctx.interaction.guild?.ownerId) {
+            await ctx.edit("This command requires the guild's owner to run it.");
             return;
         }
         
         const exists = await Clan.findOne({ where: {
-            guild: interaction.guild?.id ?? interaction.guildId
+            guild: ctx.interaction.guild?.id ?? ctx.interaction.guildId
         }});
 
         if (exists) {
-            await interaction.reply({
-                ephemeral: true,
-                content: exists.owner != user?.beatleader ?
-                    "You are not the clan owner." :
-                    "This clan was already linked to this guild."
-            });
+            await ctx.interaction.reply(exists.owner != player.beatleader ?
+                "You are not the clan owner." :
+                "This clan was already linked to this guild."
+            );
 
             return;
         }
 
-        for (let clan of user.clans.split(",")) await Clan.new(clan);
+        for (let clan of player.clans.split(",")) await Clan.new(clan);
 
-        const clan = await Clan.findOne({ where: { owner: user.beatleader } });
+        const clan = await Clan.findOne({ where: { owner: player.beatleader } });
 
         if (clan) {
-            clan.guild = (interaction.guild?.id ?? interaction.guildId) as string;
+            clan.guild = (ctx.interaction.guild?.id ?? ctx.interaction.guildId) as string;
             await clan.save();
 
-            const linkMessage = `Linked this guild to clan ${clan.tag} and user <@${interaction.user.id}>.`;
+            const linkMessage = `Linked this guild to clan ${clan.tag} and user <@${ctx.interaction.user.id}>.`;
 
-            await interaction.deferReply({ ephemeral: true });
-            await interaction.editReply(`${linkMessage} Fetching clan members now...`);
-
+            await ctx.edit(`${linkMessage} Fetching clan members now...`);
             await clan.refresh();
-            await interaction.editReply(`${linkMessage} Fetched all clan members now!`);
+            await ctx.edit(`${linkMessage} Fetched all clan members now!`);
         } else {
-            await interaction.reply({
-                ephemeral: true,
-                content: `You do not own any clans. If this is an mistake, please run \`/refresh full=True\``
-            });
+            await ctx.edit(`You do not own any clans. If this is an mistake, please run ${RefreshMeCommand.mention()} with \`full:True\``);
         }
     }
 
     @SubCommand("Refresh the clan data.")
-    async refresh(interaction: ChatInputCommandInteraction) {
-        const clan = await this._checkClan(interaction)
+    async refresh(ctx: CommandContext) {
+        await ctx.interaction.deferReply({ ephemeral: true });
+
+        const player = await ctx.user();
+        if (!player) return;
+
+        const clan = await this._checkClan(ctx.interaction)
         if (!clan) return;
 
-        const user = this._checkOwner(clan, interaction);
-        if (!user) return;
+        if (!await this._checkOwner(clan, player, ctx.interaction)) return;
 
-        await interaction.deferReply({ ephemeral: true });
-        await interaction.editReply("Refreshing clan... please wait.");
-     
+        await ctx.edit("Refreshing clan... please wait.");
         await clan.refresh();
-     
-        await interaction.editReply("Refreshed clan!");
+        await ctx.edit("Refreshed clan!");
     }
 
     @SubCommand("Configure a channel to work with the bot feature.")
     async channel(
-        interaction: ChatInputCommandInteraction,
+        ctx: CommandContext,
         @Choices(channelTypes as unknown as ChoiceValueObject)
         @Arg("The type of channel to configure.", Arg.Type.STRING) type: ChannelTypes,
         @Arg("Set a channel or omit to remove it.", Arg.Type.CHANNEL) channel: GuildTextBasedChannel | null
     ) {
-        const clan = await this._checkClan(interaction)
+        await ctx.interaction.deferReply({ ephemeral: true });
+
+        const player = await ctx.user();
+        if (!player) return;
+
+        const clan = await this._checkClan(ctx.interaction)
         if (!clan) return;
 
-        const user = await this._checkOwner(clan, interaction);
-        if (!user) return;
+        if (!await this._checkOwner(clan, player, ctx.interaction)) return;
 
         const { name } = channelTypes.find(t => t.value == type)!;
 
         if (channel == null) {
-            await interaction.reply({
-                ephemeral: true,
-                content: `Reset the **${name}** channel.`
-            });
+            await ctx.edit(`Reset the **${name}** channel.`);
 
             clan[type] = null;
             await clan.save();
@@ -175,11 +145,7 @@ export class ClanCommands {
         ], channel);
 
         if (missing) {
-            await interaction.reply({
-                ephemeral: true,
-                content: missing
-            });
-
+            await ctx.edit(missing);
             return;
         }
 
@@ -188,17 +154,16 @@ export class ClanCommands {
 
         let content = `Set the **${name}** channel to: ${channel}`;
         if (type == "leaderboardsChannel") content += "\nThere are no leaderboards enabled by default, run "
-            + "`/clan leaderboards` with any of the leaderboards as options to enable them."
+            + `</clan leaderboards:${ClanCommands.id}> with any of the leaderboards as options to enable them.`
 
-        await interaction.reply({
-            ephemeral: true,
-            content
-        });
+        await ctx.edit(content);
     }
 
     @SubCommand("Shows info about the clan.")
-    async info(interaction: ChatInputCommandInteraction) {
-        const clan = await this._checkClan(interaction);
+    async info(ctx: CommandContext) {
+        await ctx.interaction.deferReply({ ephemeral: true });
+
+        const clan = await this._checkClan(ctx.interaction);
         if (!clan) return;
 
         const embed = new EmbedBuilder();
@@ -212,7 +177,7 @@ export class ClanCommands {
         ];
 
         const hasAnySettings = channelTypes.find(t => clan[t.value] != null);
-        if (!hasAnySettings) settingsField.push(`**Tip:** Run \`/clan channel|leaderboards\` to configure this.`);
+        if (!hasAnySettings) settingsField.push(`**Tip:** Run </clan channel:${ClanCommands.id}> and </clan leaderboards:${ClanCommands.id}> to configure this.`);
 
         embed.addFields({
             name: "Settings",
@@ -236,15 +201,12 @@ export class ClanCommands {
             value: statsField.join("\n")
         });
 
-        await interaction.reply({
-            ephemeral: true,
-            embeds: [embed]
-        });
+        await ctx.edit({ embeds: [embed] });
     }
 
     @SubCommand("Enable or disable a leaderboard from showing.")
     async leaderboards(
-        interaction: ChatInputCommandInteraction,
+        ctx: CommandContext,
         @Arg("Total PP", Arg.Type.BOOLEAN) total_pp: boolean | null,
         @Arg("Pass PP", Arg.Type.BOOLEAN) pass_pp: boolean | null,
         @Arg("Accuracy PP", Arg.Type.BOOLEAN) accuracy_pp: boolean | null,
@@ -258,13 +220,15 @@ export class ClanCommands {
         @Arg("Weighted Stars for 96%", Arg.Type.BOOLEAN) weighted_stars_average_96: boolean | null,
         @Arg("Weighted Stars for 95%", Arg.Type.BOOLEAN) weighted_stars_average_95: boolean | null
     ) {        
-        const clan = await this._checkClan(interaction)
+        await ctx.interaction.deferReply({ ephemeral: true });
+
+        const player = await ctx.user();
+        if (!player) return;
+
+        const clan = await this._checkClan(ctx.interaction)
         if (!clan) return;
 
-        const user = await this._checkOwner(clan, interaction);
-        if (!user) return;
-
-        await interaction.deferReply({ ephemeral: true });
+        if (!await this._checkOwner(clan, player, ctx.interaction)) return;
 
         const clanLbs = clan.leaderboards.split(",").filter(l => !!l);
         
@@ -288,15 +252,14 @@ export class ClanCommands {
         await clan.save();
 
         if (!clanLbs.length) {
-            await interaction.editReply("Updated leaderboards list, no leaderboards to display.");
-
+            await ctx.edit("Updated leaderboards list, no leaderboards to display.");
             return;
         }
         
         const list = clanLbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `");
-        await interaction.editReply(`Updated leaderboards list, now displaying:\n\`${list}\``);
+        await ctx.edit(`Updated leaderboards list, now displaying:\n\`${list}\``);
 
-        if (clan.leaderboards != "") await leaderboardFunction(interaction.client);
+        if (clan.leaderboards != "") await leaderboardFunction(ctx.interaction.client);
     }
 }
 

@@ -1,4 +1,4 @@
-import { Client, Events, IntentsBitField, Partials, User } from "discord.js";
+import { APIApplicationCommand, Client, Events, IntentsBitField, Partials, Routes, User } from "discord.js";
 import { Leaderboard, createLeaderboard, createSong, createSongDifficulty, sequelize } from "./database/index.js";
 import ModifierRatings, { createModifierRating } from "./database/models/LeaderboardModifierRatings.js";
 import ModifierValues, { createModifierValues } from "./database/models/LeaderboardModifierValues.js";
@@ -7,7 +7,6 @@ import { rmdir, mkdir } from "fs/promises";
 import { join } from "path";
 import { Logger } from "./utils/logger.js";
 import load from "./framework.js";
-// import load from "./framework.js";
 import cron from "node-cron";
 
 // @ts-ignore
@@ -168,7 +167,18 @@ sequelize.sync()
         if (!stats) await Stats.create({ id: 0 });
     })
     .then(() => client.login(TOKEN))
-    .then(() => logger.info("Ready"));
+    .then(() => logger.info("Ready"))
+    .then(async () => {
+        const route = Routes.applicationCommands(client.application!.id);
+        const commands = await client.rest.get(route) as APIApplicationCommand[];
+
+        for (let command of commands) {
+            const int = interactions.get(command.name);
+            int!.__id = command.id;
+            // @ts-ignore
+            int!.constructor.id = command.id;
+        }
+    });
 
 process.on("unhandledRejection", logger.error.bind(null));
 process.on("uncaughtException", logger.error.bind(null));

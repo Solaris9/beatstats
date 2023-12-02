@@ -1,70 +1,43 @@
-import Discord, { ActionRowBuilder, ButtonBuilder, ButtonStyle, CacheType, ChatInputCommandInteraction, PermissionFlagsBits } from "discord.js";
-import { User } from "../database";
+import Discord, { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { beatleader } from "../api";
-import { linkDiscordMessage } from "./clan";
-import { CreateUserMethod, createUser } from "../database/models/User";
 import { drawProfile } from "../drawing/profile";
-import { Arg, Command } from "../framework";
+import { Arg, BaseCommand, Command, CommandContext } from "../framework";
 
 @Command("refresh", "Refresh your profile to where it was last cached.")
-export class RefreshMeCommand {
+export class RefreshMeCommand extends BaseCommand {
     async execute(
-        interaction: ChatInputCommandInteraction,
-        @Arg("Sync all of your scores from your profile.", Arg.Type.BOOLEAN) full: boolean | null
+        ctx: CommandContext,
+        @Arg("Force sync all of your scores from your profile.", Arg.Type.BOOLEAN)
+        force: boolean | null
     ) {
-        let user = await User.findOne({ where: { discord: interaction.user.id } });
-        if (!user) {
-            user = await createUser(CreateUserMethod.Discord, interaction.user.id);
-            
-            if (!user) {
-                await interaction.reply({
-                    ephemeral: true,
-                    content: linkDiscordMessage
-                });
+        await ctx.interaction.deferReply({ ephemeral: true });
 
-                return;
-            }
-        }
+        const player = await ctx.user();
+        if (!player) return;
 
-        const resp = await interaction.reply({
-            content: "Updating...",
-            ephemeral: true
-        });
-
-        const force = !!interaction.options.getBoolean("force");
-        await user.refresh(true, force);
-
-        await resp.edit("Synced your profile!");
+        await ctx.edit("Updating...");
+        await player.refresh(true, !!force);
+        await ctx.edit("Synced your profile!");
     }
 }
 
 @Command("profile", "Show your BeatLeader profile information.")
 export class ProfileCommand {
     async execute(
-        interaction: ChatInputCommandInteraction,
+        ctx: CommandContext,
         @Arg("A user to view their profile.", Arg.Type.USER)
-        user: Discord.User | null = interaction.user
+        user: Discord.User | null = ctx.interaction.user
     ) {
-        await interaction.deferReply();
+        await ctx.interaction.deferReply();
 
-        let player = await User.findOne({ where: { discord: user!.id } });
-        if (!player) {
-            player = await createUser(CreateUserMethod.Discord, user!.id);
-
-            if (!player) {
-                await interaction.editReply({
-                    content: linkDiscordMessage,
-                });
-
-                return;
-            }
-        }
+        const player = await ctx.user(user?.id);
+        if (!player) return;
 
         const profile = await beatleader.player[player.beatleader].get_json();
 
         const file = await drawProfile("minimal", player, profile);
         if (!file) {
-            await interaction.editReply("Failed to generate image.");
+            await ctx.edit("Failed to generate image.");
             return;
         }
 
@@ -76,7 +49,7 @@ export class ProfileCommand {
         const row = new ActionRowBuilder()
             .addComponents(profileButton)
 
-        await interaction.editReply({
+        await ctx.edit({
             files: [file],
             content: "",
             // @ts-ignore

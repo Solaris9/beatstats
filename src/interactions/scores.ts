@@ -1,4 +1,4 @@
-import { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, ChatInputCommandInteraction, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable } from "discord.js";
+import Discord, { GuildTextBasedChannel, ButtonBuilder, ButtonStyle, ActionRowBuilder, StringSelectMenuOptionBuilder, StringSelectMenuInteraction, Client, CommandInteraction, AttachmentBuilder, Guild, PermissionFlagsBits, Interaction, MessageResolvable } from "discord.js";
 import { WebSocket } from "ws";
 import { ScoreImprovement, Stats, User, sequelize } from "../database";
 import { drawCard } from "../drawing/scores/index";
@@ -17,8 +17,7 @@ import PlaylistUtils from "../utils/PlaylistUtils";
 import { Query, _Difficulty, _Leaderboard, _Score, _Song, _User } from "../database/manual";
 import Clan from "../database/models/Clan";
 import { CreateUserMethod, createUser } from "../database/models/User.js";
-import { linkDiscordMessage } from "./clan.js";
-import { Arg, Bounds, Choices, SubCommand, Command, ChoiceValueTuple, createStringSelect } from "../framework.js";
+import { Arg, Bounds, Choices, SubCommand, Command, ChoiceValueTuple, createStringSelect, CommandContext, linkDiscordMessage } from "../framework.js";
 
 const logger = new Logger("Live-Scores");
 
@@ -106,7 +105,7 @@ export class ShareScoresCommand {
     
     @SubCommand("Share a score by searching!")
     async search(
-        int: ChatInputCommandInteraction,
+        ctx: CommandContext,
         @Choices(contexts)
         @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null,
 
@@ -114,14 +113,17 @@ export class ShareScoresCommand {
         @Arg("The mapper search query.", Arg.Type.STRING) mapper: string | null,
         @Arg("The author search query.", Arg.Type.STRING) author: string | null,
     ) {
-        await int.deferReply({ ephemeral: true });
+        await ctx.interaction.deferReply({ ephemeral: true });
+
+        const player = await ctx.user();
+        if (!player) return;
 
         const options = ["name", "mapper", "author"];
         const values = { name, mapper, author };
         const hasAny = options.find(o => values[o]);
         
         if (!hasAny) {
-            await int.editReply("Please add either a `name`, `mapper` or `author` argument to the command.");
+            await ctx.interaction.editReply("Please add either a `name`, `mapper` or `author` argument to the command.");
             return;
         }
 
@@ -133,7 +135,7 @@ export class ShareScoresCommand {
             .from(_Score)
             .join(_User)
             .where(_User.beatleader, "=", _Score.playerId)
-            .where(_User.discord, "=", int.user.id)
+            .where(_User.discord, "=", player.discord)
             .join(_Leaderboard)
             .where(_Leaderboard.leaderboardId, "=", _Score.leaderboardId)
             .join(_Difficulty)
@@ -144,7 +146,7 @@ export class ShareScoresCommand {
         let replacements = {} as Record<string, string>;
 
         for (let option of options) {
-            const value = int.options.getString(option, false);
+            const value = values[option];
             if (value != null) {
                 query.where(_Song[option], "LIKE", Query.param(option));
                 replacements[option] = `%${value}%`;
@@ -169,7 +171,7 @@ export class ShareScoresCommand {
         });
 
         if (!results.length) {
-            await int.editReply({
+            await ctx.interaction.editReply({
                 content: "No scores found with that query.",
             });
             
@@ -177,8 +179,8 @@ export class ShareScoresCommand {
         }
 
         if (results.length == 1) {
-            await int.editReply("Sending...");
-            await sendScoreCard([results[0].scoreId], int.channel as GuildTextBasedChannel);
+            await ctx.interaction.editReply("Sending...");
+            await sendScoreCard([results[0].scoreId], ctx.interaction.channel as GuildTextBasedChannel);
             return;
         }
 
@@ -205,65 +207,62 @@ export class ShareScoresCommand {
     
         const row = new ActionRowBuilder({ components: [select] });
         
-        await int.editReply({
+        await ctx.interaction.editReply({
             // @ts-ignore
             components: [row],
         });
 
-        this.#interactions[int.user.id] = int;
+        this.#interactions[player.discord] = ctx.interaction;
     }
 
     @SubCommand("Share your recent scores!")
     async recent(
-        int: ChatInputCommandInteraction,
-        @Arg("A user to share their scores.", Arg.Type.USER) user: User | null,
+        ctx: CommandContext,
+        @Arg("A user to share their scores.", Arg.Type.USER)
+        user: Discord.User | null = ctx.interaction.user,
+
         @Choices(contexts)
         @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null
     ) {
+        await ctx.interaction.deferReply({ ephemeral: true });
+
+        const player = await ctx.user(user!.id);
+        if (!player) return;
+
         const sortBy = "date";
         const leaderboardContext = context ?? "2";
         
-        this.topAndRecent(int, leaderboardContext, sortBy, user);
+        this.topAndRecent(ctx, leaderboardContext, sortBy, player);
     }
 
     @SubCommand("Share your top scores!")
     async top(
-        int: ChatInputCommandInteraction,
-        @Arg("A user to share their scores.", Arg.Type.USER) user: User | null,
+        ctx: CommandContext,
+        @Arg("A user to share their scores.", Arg.Type.USER)
+        user: Discord.User | null = ctx.interaction.user,
+
         @Choices(contexts)
         @Arg("The leaderboard context to use. Default: General ", Arg.Type.STRING) context: string | null
     ) {
+        await ctx.interaction.deferReply({ ephemeral: true });
+
+        const player = await ctx.user(user!.id);
+        if (!player) return;
+
         const sortBy = "pp";
         const leaderboardContext = context ?? "2";
 
-        this.topAndRecent(int, leaderboardContext, sortBy, user);
+        this.topAndRecent(ctx, leaderboardContext, sortBy, player);
     }
 
     async topAndRecent(
-        int: ChatInputCommandInteraction,
+        ctx: CommandContext,
         leaderboardContext: string,
         sortBy: string,
-        mentioned: User | null,
+        user: User,
     ) {
-        await int.deferReply({ ephemeral: true });
-
-        const old = this.#interactions[int.user.id];
+        const old = this.#interactions[user.discord];
         try { await old.deleteReply() } catch { }
-
-        const discord = (mentioned ?? int.user).id;
-        let user = await User.findOne({ where: { discord } });
-        
-        if (!user) {
-            user = await createUser(CreateUserMethod.Discord, discord);
-
-            if (!user) {
-                await int.editReply({
-                    content: linkDiscordMessage,
-                });
-
-                return;
-            }
-        }
     
         const json = await beatleader.player[user.beatleader].scores.get_json({
             query: {
@@ -273,7 +272,7 @@ export class ShareScoresCommand {
             }
         });
 
-        this.#scores[int.user.id] = json.data;
+        this.#scores[user.discord] = json.data;
 
         const selectScores = json.data.map(score => {
             const difficulty = score.leaderboard.difficulty;
@@ -310,13 +309,13 @@ export class ShareScoresCommand {
     
         const row = new ActionRowBuilder({ components: [select] });
         
-        await int.editReply({
+        await ctx.interaction.editReply({
             // @ts-ignore
             components: [row],
             ephemeral: true
         });
 
-        this.#interactions[int.user.id] = int;
+        this.#interactions[user.discord] = ctx.interaction;
     }
 
     async onStringSelect(interaction: StringSelectMenuInteraction) {
@@ -584,7 +583,7 @@ export class PlaylistCommand {
 
     @SubCommand("Generate a playlist of maps for potential scores.")
     async potential(
-        int: ChatInputCommandInteraction,
+        ctx: CommandContext,
 
         @Arg("Whether to use all leaderboards") all: boolean,
         @Arg("The PP target to achieve", Arg.Type.DOUBLE) pp: number,
@@ -632,8 +631,13 @@ export class PlaylistCommand {
         @Arg("Include No Walls modifier", Arg.Type.BOOLEAN) no: boolean | null,
         @Arg("Include No Arrows modifier", Arg.Type.BOOLEAN) na: boolean | null,
     ) {
-        await int.deferReply();
-        const user = await User.findOne({ where: { discord: int.user.id } });
+        await ctx.interaction.deferReply();
+        const player = await ctx.user(false);
+        
+        if (all && !player) {
+            await ctx.interaction.editReply(`Unable to use \`all\` option without a Discord linked.\n${linkDiscordMessage}`);
+            return;
+        }
 
         const mods: string[] = [];
 
@@ -661,12 +665,12 @@ export class PlaylistCommand {
             }
         ];
 
-        if (!all) {
+        if (!all && player) {
             const opts: any = {
                 model: Score,
                 as: "scores",
                 where: {
-                    playerId: user?.beatleader,
+                    playerId: player.beatleader,
                 }
             };
 
@@ -765,7 +769,7 @@ export class PlaylistCommand {
             .filter(s => s != null && s.requiredAcc && s.leaderboard.difficulty) as PotentialLeaderboard[];
 
         if (scores.length == 0) {
-            await int.editReply("0 leaderboards found with that criteria, please try again with a different parameter.",);
+            await ctx.interaction.editReply("0 leaderboards found with that criteria, please try again with a different parameter.",);
             return;
         }
     
@@ -796,7 +800,7 @@ export class PlaylistCommand {
         const text = new AttachmentBuilder(buffer, { name: "maps.txt" });
 
         const lbs = [...new Set(scores.map(s => s.leaderboard))];
-        const playlist = PlaylistUtils.build(lbs, `plays-for-${pp}-pp`, user);
+        const playlist = PlaylistUtils.build(lbs, `plays-for-${pp}-pp`, player);
 
         const content = [`leaderboards each worth ${pp}pp`];
         if (mods.length) content.push(`with ${mods.join("/")}`);
@@ -809,7 +813,7 @@ export class PlaylistCommand {
 
         const intl = new Intl.ListFormat("en", { style: "long" });
 
-        await int.editReply({
+        await ctx.interaction.editReply({
             content: [lbs.length, content.length ? intl.format(content) : ""].join(" "),
             files: [text, playlist]
         });
@@ -817,7 +821,7 @@ export class PlaylistCommand {
 
     @SubCommand("Generate a playlist of your scores with a query.")
     async scores(
-        interaction: ChatInputCommandInteraction,
+        ctx: CommandContext,
         @Arg("The name of the playlist.") name: string,
         @Choices([
             ["Ranked", "3"],
@@ -834,42 +838,26 @@ export class PlaylistCommand {
         @Bounds({ min: 0.0 })
         @Arg("The maximum pp.", Arg.Type.DOUBLE) max_pp: number | null,
     ) {
-        const option = interaction.options.getUser("user", false);
-        const discord = (option ?? interaction.user).id;
+        await ctx.interaction.deferReply();
 
-        let user = await User.findOne({ where: { discord } });
-        if (!user) {
-            user = await createUser(CreateUserMethod.Discord, discord);
+        const player = await ctx.user();
+        if (!player) return;
 
-            if (!user) {
-                await interaction.reply({
-                    content: linkDiscordMessage,
-                    ephemeral: true,
-                });
-                
-
-                return;
-            }
-        }
-
-        await interaction.deferReply();
         const content: string[] = [];
-
         const where: WhereOptions = {};
-        const opts = interaction.options;
         
         const status = !type ? "" : type == "3" ? "ranked" : "unranked";
 
-        const acc = [opts.getNumber("min-acc"), opts.getNumber("max-acc")];
-        const pp = [opts.getNumber("min-pp"), opts.getNumber("max-pp")];
+        const acc = [min_acc, max_acc];
+        const pp = [min_pp, max_pp];
 
         if (acc[0] != null && acc[1] != null && acc[0] > acc[1]) {
-            await interaction.editReply("Minimum accuracy cannot be higher than maximum accuracy.")
+            await ctx.interaction.editReply("Minimum accuracy cannot be higher than maximum accuracy.");
             return;
         }
 
         if (pp[0] != null && pp[1] != null && pp[0] > pp[1]) {
-            await interaction.editReply("Minimum pp cannot be higher than maximum pp.")
+            await ctx.interaction.editReply("Minimum pp cannot be higher than maximum pp.");
             return;
         }
 
@@ -898,7 +886,7 @@ export class PlaylistCommand {
             include: [
                 {
                     model: User,
-                    where: { beatleader: user.beatleader }
+                    where: { beatleader: player.beatleader }
                 },
                 {
                     model: Leaderboard,
@@ -916,8 +904,8 @@ export class PlaylistCommand {
         const leaderboards = [...new Set(scores.map(s => s.leaderboard!))];
         const intl = new Intl.ListFormat("en", { style: "long" });
 
-        const file = PlaylistUtils.build(leaderboards, name, user);
-        await interaction.editReply({
+        const file = PlaylistUtils.build(leaderboards, name, player);
+        await ctx.interaction.editReply({
             content: [leaderboards.length, status, `leaderboards`, content.length ? intl.format(content) : ""].join(" "),
             files: [file]
         });

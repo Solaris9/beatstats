@@ -1,10 +1,13 @@
-import { Attachment, ButtonBuilder, ButtonInteraction, ChatInputCommandInteraction, Client, Collection, Message, Role, StringSelectMenuBuilder, StringSelectMenuInteraction, User } from "discord.js";
+import { Attachment, Base, ButtonBuilder, ButtonInteraction, ChatInputCommandInteraction, Client, Collection, Message, Role, StringSelectMenuBuilder, StringSelectMenuInteraction, User } from "discord.js";
+import { User as DBUser } from "./database";
 import { glob } from "glob";
 import { Logger } from "./utils/logger.js";
 import "reflect-metadata"
+import { CreateUserMethod, createUser } from "./database/models/User.js";
 
 const logger = new Logger("Loader");
 const MessageCommandSym = Symbol("message command");
+export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
 
 // declare module "./test.js" {
 //     interface CustomOptions {}
@@ -14,13 +17,28 @@ const MessageCommandSym = Symbol("message command");
 
 type Class = new () => any;
 
-type CommandInstance = {
+export type CommandInstance = {
+    __id: string;
     __custom: CustomOptions;
     __data: ChatInteractionOption;
     __handle(int: ChatInputCommandInteraction): Promise<Function>;
     onStringSelect(int: StringSelectMenuInteraction): Promise<void>;
     onButtonClick(int: ButtonInteraction): Promise<void>;
 }
+
+export class BaseCommand implements Omit<CommandInstance, "__handle" | "onStringSelect" | "onButtonClick"> {
+    declare __id: string;
+    declare __custom: CustomOptions;
+    declare __data: ChatInteractionOption;
+    declare static id: string;
+    
+    static get mention() {
+        const data = Reflect.getMetadata("@data", this.prototype) as ChatInteractionOption;
+        return (rest?: string) => `</${data.name}${rest ? ` ${rest}` : ""}:${this.id}>`
+    }
+    
+}
+
 
 export enum ChatInteractionOptionType {
     SUB_COMMAND = 1,
@@ -132,10 +150,11 @@ export function Command(name: string, description: string) {
             __handle(int: ChatInputCommandInteraction) {
                 const group = int.options.getSubcommandGroup(false);
                 const sub = int.options.getSubcommand(false);
+                const ctx = new CommandContext(int);
         
                 if (!group && !sub) {
                     const args = parseArguments(target, "execute", this.__data, int)
-                    return this.execute(int, ...args);
+                    return this.execute(ctx, ...args);
                 }
                 
                 let option = this.__data as ChatInteractionOption;
@@ -155,7 +174,7 @@ export function Command(name: string, description: string) {
                 if ("_handle" in option && option._handle as string in this) {
                     const name = option._handle as string;
                     const args = parseArguments(target, name, option, int);
-                    return this[name](int, ...args);
+                    return this[name](ctx, ...args);
                 }
 
                 let name: string = "";
@@ -395,6 +414,35 @@ function loadCommand(cls: Class): CommandInstance {
 }
 
 //#endregion
+
+export class CommandContext {
+    constructor(public interaction: ChatInputCommandInteraction) {}
+
+    get user() {
+        let discord = this.interaction.user!.id;
+        const that = this;
+
+        return async (id?: string | false) => {
+            if (id) discord = id;
+
+            let player = await DBUser.findOne({ where: {  discord } });
+            if (!player) {
+                if (id == false) return;
+                player = await createUser(CreateUserMethod.Discord, discord);
+
+                if (!player) {
+                    await that.interaction.editReply(linkDiscordMessage);
+                    return;
+                }
+            }
+
+            return player;
+        }
+    }
+
+    edit: ChatInputCommandInteraction["editReply"] = (options: any) =>
+        this.interaction.editReply(options);   
+}
 
 export default (client?: Client) => {
     const events = [] as [boolean, string, (client: Client, ...args: unknown[]) => Promise<void>][];

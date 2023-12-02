@@ -1,4 +1,3 @@
-import { Op, Sequelize } from "sequelize";
 import Stats from "./database/models/Stats";
 import { IClanContainer, ILeaderboard, IPlayer, IResultPagination, IScore } from "./types/beatleader";
 import { Logger } from "./utils/logger";
