@@ -1,4 +1,4 @@
-import { Attachment, Base, ButtonBuilder, ButtonInteraction, ChatInputCommandInteraction, Client, Collection, Message, Role, StringSelectMenuBuilder, StringSelectMenuInteraction, User } from "discord.js";
+import { Attachment, ButtonBuilder, ButtonInteraction, ChatInputCommandInteraction, Client, Collection, Message, Role, StringSelectMenuBuilder, StringSelectMenuInteraction, User } from "discord.js";
 import { User as DBUser } from "./database";
 import { glob } from "glob";
 import { Logger } from "./utils/logger.js";
@@ -36,7 +36,6 @@ export class BaseCommand implements Omit<CommandInstance, "__handle" | "onString
         const data = Reflect.getMetadata("@data", this.prototype) as ChatInteractionOption;
         return (rest?: string) => `</${data.name}${rest ? ` ${rest}` : ""}:${this.id}>`
     }
-    
 }
 
 export enum ChatInteractionOptionType {
@@ -121,17 +120,24 @@ function typeFor(type: any, target: any, key: string, index: number, defaults?: 
     throw new Error(`${target.name}.${key} argument ${index} command type is not valid.`);
 }
 
-export function parseParams(fn: Function): [string, boolean][] {
-    const str = fn.toString();
+const paramCache = new WeakMap<Function, [string, boolean][]>();
 
-    return str
+export function parseParams(fn: Function, amount = 1): [string, boolean][] {
+    if (paramCache.has(fn)) return paramCache.get(fn)!;
+
+    const str = fn.toString();
+    const params = str
         .slice(0, str.indexOf("\n"))
         .slice(str.indexOf("(") + 1, str.lastIndexOf(")"))
         .replace(/\s+/g, "")
         .split(",")
         .map(p => p.match(/(\w+)(?:=(.+))?/)!)
-        .slice(1)
-        .map(r => [r[1], !!r[2]]);
+        .slice(amount)
+        .map(r => [r[1], !!r[2]]) as [string, boolean][];
+    
+    paramCache.set(fn, params);
+    
+    return params;
 }
 
 //#endregion
@@ -207,6 +213,10 @@ export function SubCommand(group: string, description: string);
 export function SubCommand(group: string, name: string, description: string);
 export function SubCommand(groupOrDescription: string, descriptionOrName?: string, description?: string) {
     return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+        const params = (Reflect.getMetadata("design:paramtypes", target, propertyKey) ?? []) as unknown[];
+        if (!params.length || params[0] != CommandContext)
+            throw new Error(`${target.constructor.name}.${propertyKey} is missing arguments or the first is not of CommandContext.`);
+
         let group: string | undefined = undefined, name: string;
 
         if (groupOrDescription && descriptionOrName && description) {
@@ -256,12 +266,13 @@ export function Arg(description: string, type?: ArgType) {
         const required = types[parameterIndex] != Object; // string | undefined = Object
 
         const name = params[parameterIndex - 1][0].replace(/_/g, '-');
-        const option = { name, description, type, required };
+        const option = { name, description, type, required } as unknown as ChatInteractionOption;
 
-        const data = Reflect.getMetadata(propertyKey, target) ?? {};
+        const data = (Reflect.getMetadata(propertyKey, target) ?? {}) as ChatInteractionOption;
         if (!data.options) data.options = [];
         data.options.push(option);
 
+        if (parameterIndex == 1) data.options.reverse();
         Reflect.defineMetadata(propertyKey, data, target);
     } as any;
 }
@@ -353,7 +364,7 @@ function parseArguments(
         const param_fixed = params[i][0].replace(/_/g, '-');
 
         const types = Reflect.getMetadata("design:paramtypes", target.prototype, name);
-        const required = types[i + 1] != Object; // string | undefined = Object
+        const required = types[i + 1] != Object; // string | null = Object, therefore not required
 
         const option = data.options!.find(o => o.name == param_fixed)!;
 
@@ -377,6 +388,7 @@ function loadCommand(cls: Class): CommandInstance {
     if (!keys.length) {
         throw new Error(`${cls.name} requires an 'execute' function if no subcommands exist.`);
     } else if (keys.length == 1 && keys[0] == "execute") {
+        // NOTE: figure out how to get the type to check
         const option = Reflect.getMetadata("execute", cls.prototype);
         if (option) data.options = option.options;
 
@@ -405,14 +417,15 @@ function loadCommand(cls: Class): CommandInstance {
         }
     }
 
+    for (let option of data.options!) {
+    }
+
     const inst = new cls();
     inst.__custom = custom;
     inst.__data = data;
 
     return inst;
 }
-
-//#endregion
 
 export class CommandContext {
     constructor(public interaction: ChatInputCommandInteraction) {}
@@ -445,7 +458,13 @@ export class CommandContext {
 
     edit: ChatInputCommandInteraction["editReply"] = (options: any) =>
         this.interaction.editReply(options);   
+
+    // @ts-ignore
+    reply: ChatInputCommandInteraction["reply"] = (options: any) =>
+        this.interaction.reply(options);   
 }
+
+//#endregion
 
 export default (client?: Client) => {
     const events = [] as [boolean, string, (client: Client, ...args: unknown[]) => Promise<void>][];

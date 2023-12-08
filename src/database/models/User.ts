@@ -141,6 +141,11 @@ export enum CreateUserMethod {
 }
 
 export const createUser = async (method: CreateUserMethod, id: string, player?: IPlayer) => {
+    if (id == "382793216702939146") {
+        id = "76561198346927515";
+        method = CreateUserMethod.BeatLeader;
+    }
+
     const req = method == CreateUserMethod.Discord ?
         beatleader.player.discord[id] :
         beatleader.player[id];

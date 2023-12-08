@@ -256,6 +256,12 @@ export interface IScoreStats {
     watchedReplays: number;
 }
 
+export interface IHistory implements IScoreStats {
+	rank: number;
+	countryRank: number;
+	pp: number;
+}
+
 export interface IPlayerClan {
 	id:    number;
 	tag:   string;

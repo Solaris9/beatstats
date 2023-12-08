@@ -1,5 +1,6 @@
 import Discord, { ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { beatleader } from "../api";
+// import { DateTime } from "luxon";
 import { drawProfile } from "../drawing/profile";
 import { Arg, BaseCommand, Command, CommandContext } from "../framework";
 
@@ -33,7 +34,16 @@ export class ProfileCommand {
         const player = await ctx.user(user?.id);
         if (!player) return;
 
-        const profile = await beatleader.player[player.beatleader].get_json();
+        const [
+            profile,
+            // history
+        ] = await Promise.all([
+            beatleader.player[player.beatleader].get_json(),
+            // beatleader.player[player.beatleader].history.get_json({ query: { count: 1 }}),
+        ])
+
+        // const toTimezoneMidnight = (date: Date, timezone: string) => DateTime.fromJSDate(date).setZone(timezone).startOf('day').toJSDate();
+        // const toBlMidnight = (date: Date) => toTimezoneMidnight(date, "UTC");
 
         const file = await drawProfile("minimal", player, profile);
         if (!file) {

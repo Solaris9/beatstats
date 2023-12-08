@@ -62,8 +62,8 @@ export default async (score: Score) => {
     const scoreScore = score.baseScore != score.modifiedScore ? score.modifiedScore : score.baseScore;
     const scorePoints = `${score.pp.toFixed(2)}pp`;
     const scoreAccuracy = `${(score.accuracy * 100).toFixed(2)}%`;
-    const scoreLeft = score.accLeft.toFixed(2);
-    const scoreRight = score.accRight.toFixed(2);
+    const scoreLeft = (score.accLeft ?? 0).toFixed(2);
+    const scoreRight = (score.accRight ?? 0).toFixed(2);
     const scoreCombo = score.fullCombo ? "FC" : `${score.missedNotes + score.badCuts}X`;
 
     // image config

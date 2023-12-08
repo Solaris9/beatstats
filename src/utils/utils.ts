@@ -67,8 +67,13 @@ const permissionMessages = new Map([
 ]);
 
 export async function checkPermission(permissions: bigint[], interaction: ChatInputCommandInteraction): Promise<string | undefined>;
-export async function checkPermission(permissions: bigint[], channel: GuildTextBasedChannel): Promise<string | undefined>;
-export async function checkPermission(permissions: bigint[], interactionOrChannel: ChatInputCommandInteraction | GuildTextBasedChannel): Promise<string | undefined> {
+export async function checkPermission(permissions: bigint[], channel: GuildTextBasedChannel | null): Promise<string | undefined>;
+export async function checkPermission(
+    permissions: bigint[],
+    interactionOrChannel: ChatInputCommandInteraction | GuildTextBasedChannel | null
+): Promise<string | undefined> {
+    if (!interactionOrChannel) return;
+
     let channel: GuildTextBasedChannel;
     
     if (interactionOrChannel instanceof ChatInputCommandInteraction) {

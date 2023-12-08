@@ -3,13 +3,13 @@ import { User } from "../../database";
 import minimal from "./minimal";
 import { IPlayer } from "../../types/beatleader";
 
-const types = ["minimal"] as const;
-type Types = typeof types[number];
 type Draw = (user: User, player: IPlayer) => Promise<string | null>;
 
-const map: Record<Types, Draw> = {
+const map = {
     minimal
-};
+} satisfies Record<string, Draw>;
+
+type Types = keyof typeof map;
 
 export const drawProfile = async (type: Types, user: User, player: IPlayer) => {
     const draw = map[type] ?? minimal;

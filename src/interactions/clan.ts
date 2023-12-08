@@ -25,24 +25,24 @@ type ChannelTypes = typeof channelTypes[number]["value"]
 
 @Command("clan", "Manage your clan.")
 export class ClanCommands extends BaseCommand {
-    async _checkClan(interaction: ChatInputCommandInteraction) {
+    async _checkClan(ctx: CommandContext) {
         const clan = await Clan.findOne({
             where: {
-                guild: interaction.guild?.id ?? interaction.guildId
+                guild: ctx.interaction.guild?.id ?? ctx.interaction.guildId
             }
         });
         
         if (!clan) {
-            await interaction.reply(`Please run ${ClanCommands.mention("setup")} first.`);
+            await ctx.edit(`Please run ${ClanCommands.mention("setup")} first.`);
             return false;
         }
 
         return clan;
     }
 
-    async _checkOwner(clan: Clan, player: User, interaction: ChatInputCommandInteraction) {
+    async _checkOwner(clan: Clan, player: User, ctx: CommandContext) {
         if (clan.owner != player.beatleader) {
-            await interaction.reply("You are not the clan owner.");
+            await ctx.edit("You are not the clan owner.");
             return false;
         }
 
@@ -89,7 +89,7 @@ export class ClanCommands extends BaseCommand {
             await clan.refresh();
             await ctx.edit(`${linkMessage} Fetched all clan members now!`);
         } else {
-            await ctx.edit(`You do not own any clans. If this is an mistake, please run ${RefreshMeCommand.mention()} with \`full:True\``);
+            await ctx.edit(`You do not own any clans. If this is an mistake, please run ${RefreshMeCommand.mention()}`);
         }
     }
 
@@ -100,10 +100,10 @@ export class ClanCommands extends BaseCommand {
         const player = await ctx.user();
         if (!player) return;
 
-        const clan = await this._checkClan(ctx.interaction)
+        const clan = await this._checkClan(ctx)
         if (!clan) return;
 
-        if (!await this._checkOwner(clan, player, ctx.interaction)) return;
+        if (!await this._checkOwner(clan, player, ctx)) return;
 
         await ctx.edit("Refreshing clan... please wait.");
         await clan.refresh();
@@ -122,10 +122,10 @@ export class ClanCommands extends BaseCommand {
         const player = await ctx.user();
         if (!player) return;
 
-        const clan = await this._checkClan(ctx.interaction)
+        const clan = await this._checkClan(ctx)
         if (!clan) return;
 
-        if (!await this._checkOwner(clan, player, ctx.interaction)) return;
+        if (!await this._checkOwner(clan, player, ctx)) return;
 
         const { name } = channelTypes.find(t => t.value == type)!;
 
@@ -154,7 +154,7 @@ export class ClanCommands extends BaseCommand {
 
         let content = `Set the **${name}** channel to: ${channel}`;
         if (type == "leaderboardsChannel") content += "\nThere are no leaderboards enabled by default, run "
-            + `</clan leaderboards:${ClanCommands.id}> with any of the leaderboards as options to enable them.`
+            + `${ClanCommands.mention("leaderboards")} with any of the leaderboards as options to enable them.`
 
         await ctx.edit(content);
     }
@@ -163,7 +163,7 @@ export class ClanCommands extends BaseCommand {
     async info(ctx: CommandContext) {
         await ctx.defer(true);
 
-        const clan = await this._checkClan(ctx.interaction);
+        const clan = await this._checkClan(ctx);
         if (!clan) return;
 
         const embed = new EmbedBuilder();
@@ -177,7 +177,7 @@ export class ClanCommands extends BaseCommand {
         ];
 
         const hasAnySettings = channelTypes.find(t => clan[t.value] != null);
-        if (!hasAnySettings) settingsField.push(`**Tip:** Run </clan channel:${ClanCommands.id}> and </clan leaderboards:${ClanCommands.id}> to configure this.`);
+        if (!hasAnySettings) settingsField.push(`**Tip:** Run ${ClanCommands.mention("channel")} and ${ClanCommands.mention("leaderboards")} to configure this.`);
 
         embed.addFields({
             name: "Settings",
@@ -219,16 +219,16 @@ export class ClanCommands extends BaseCommand {
         @Arg("Weighted Stars for 97%", Arg.Type.BOOLEAN) weighted_stars_average_97: boolean | null,
         @Arg("Weighted Stars for 96%", Arg.Type.BOOLEAN) weighted_stars_average_96: boolean | null,
         @Arg("Weighted Stars for 95%", Arg.Type.BOOLEAN) weighted_stars_average_95: boolean | null
-    ) {        
+    ) {
         await ctx.defer(true);
 
         const player = await ctx.user();
         if (!player) return;
 
-        const clan = await this._checkClan(ctx.interaction)
+        const clan = await this._checkClan(ctx)
         if (!clan) return;
 
-        if (!await this._checkOwner(clan, player, ctx.interaction)) return;
+        if (!await this._checkOwner(clan, player, ctx)) return;
 
         const clanLbs = clan.leaderboards.split(",").filter(l => !!l);
         

@@ -66,8 +66,8 @@ export const onceReady = async (client: Client) => {
                         continue;
                     }
         
-                    const channel = await guild.channels.fetch(clan.liveScoresChannel!) as GuildTextBasedChannel;
-
+                    const channel = await guild.channels.fetch(clan.liveScoresChannel!).catch(() => null) as GuildTextBasedChannel | null;
+                    
                     const missing = await checkPermission([
                         PermissionFlagsBits.SendMessages,
                         PermissionFlagsBits.SendMessagesInThreads,
@@ -595,13 +595,13 @@ export class PlaylistCommand {
             ["High -> Low", ">"],
             ["Low -> High", "<"],
         ])
-        @Arg("Shows the increase needed, only works with all:False", Arg.Type.STRING)
+        @Arg("The direction to sort scores", Arg.Type.STRING)
         direction: string | null,
 
         @Choices([
             ["Accuracy", "acc"],
             ["Stars", "stars"],
-            ["Increase", "increase"],
+            ["Increase (requires comparison:True)", "increase"],
         ])
         @Arg("The order to sort the scores", Arg.Type.STRING) sort: string | null,
 
