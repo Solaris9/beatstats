@@ -370,8 +370,8 @@ function parseArguments(
 
         const converter = converterMap[option.type];
         const value = int.options[converter](param_fixed, required);
-        
-        parsed.push(params[i][1] ? undefined : value);
+
+        parsed.push(params[i][1] && value == null ? undefined : value);
     }
 
     return parsed;
@@ -415,9 +415,6 @@ function loadCommand(cls: Class): CommandInstance {
         } else {
             data.options!.push(option);
         }
-    }
-
-    for (let option of data.options!) {
     }
 
     const inst = new cls();
