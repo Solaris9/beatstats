@@ -1,36 +1,49 @@
 import { Sequelize } from 'sequelize-typescript';
 
-import LeaderboardModifierValues, { createModifierValues } from "./models/LeaderboardModifierValues.js";
+import LeaderboardModifierValues, { createModifierValues, getModifier } from "./models/LeaderboardModifierValues.js";
 import LeaderboardModifierRatings, { createModifierRating } from "./models/LeaderboardModifierRatings.js";
-import Leaderboard, { createLeaderboard } from "./models/Leaderboard.js";
+import Leaderboard, { createLeaderboard, LeaderboardType } from "./models/Leaderboard.js";
 import ScoreOffsets from "./models/ScoreOffsets.js";
 import ScoreImprovement from "./models/ScoreImprovement.js";
 import Score, { createScore } from "./models/Score.js";
-import SongDifficulty, { createSongDifficulty } from "./models/SongDifficulty.js";
+import SongDifficulty, { createSongDifficulty, getDifficultyName, getModeName } from "./models/SongDifficulty.js";
 import Song, { createSong } from "./models/Song.js";
-import User from "./models/User.js";
+import User, { createUser, CreateUserMethod } from "./models/User.js";
 import Clan from "./models/Clan.js";
 import Stats from "./models/Stats.js";
-import { Op } from 'sequelize';
 
 export {
     Stats,
     Clan,
+
     User,
+    createUser,
+    CreateUserMethod,
+
     Song,
+    createSong,
+    
     SongDifficulty,
+    createSongDifficulty,
+    getDifficultyName,
+    getModeName,
+    
     Score,
+    createScore,
+    
     ScoreImprovement,
     ScoreOffsets,
+    
     Leaderboard,
-    LeaderboardModifierRatings,
-    LeaderboardModifierValues,
-    createSong,
-    createSongDifficulty,
-    createModifierRating,
-    createModifierValues,
     createLeaderboard,
-    createScore
+    LeaderboardType,
+    
+    LeaderboardModifierRatings,
+    createModifierRating,
+
+    LeaderboardModifierValues,
+    createModifierValues,
+    getModifier
 }
 
 // class BitField {
@@ -64,7 +77,7 @@ export {
 //     static DiscordMember = 2;
 // }
 
-export const sequelize = new Sequelize({
+export default new Sequelize({
     logging: false,
     storage: 'database.sqlite',
     dialect: 'sqlite',

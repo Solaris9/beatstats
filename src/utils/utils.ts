@@ -93,3 +93,12 @@ export const PromiseSettled = async <T>(promise: Promise<T>) => {
     const result = await Promise.allSettled([promise]);
     return result[0]
 }
+
+export class KVMap<T> extends Map<T, T> {
+    public set(key: T, value: T) {
+        super.set(key, value);
+        super.set(value, key);
+        
+        return this;
+    }
+}

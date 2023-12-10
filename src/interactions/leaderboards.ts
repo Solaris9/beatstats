@@ -3,6 +3,7 @@ import drawLeaderboard from "../drawing/leaderboards";
 import cron from "node-cron";
 import { Clan, Leaderboard, Score, User } from "../database";
 import { Op, col } from "sequelize";
+import { KVMap } from "../utils/utils";
 
 const formatter = new Intl.NumberFormat("en");
 
@@ -21,35 +22,20 @@ export const leaderboards = {
     "c_starsWeightedAverage95": "Weighted Stars for 95%",
 } as const;
 
-export const leaderboardKV = {
-    "totalPP": "total-pp",
-    "passPP": "pass-pp",
-    "accPP": "accuracy-pp",
-    "techPP": "tech-pp",
-    "topPP": "top-pp",
-    "accuracyRankedAverage": "ranked-accuracy",
-    "accuracyRankedWeightedAverage": "weighted-ranked-accuracy",
-    "c_starsWeightedAverage99": "stars-weighted-average-99",
-    "c_starsWeightedAverage98": "stars-weighted-average-98",
-    "c_starsWeightedAverage97": "stars-weighted-average-97",
-    "c_starsWeightedAverage96": "stars-weighted-average-96",
-    "c_starsWeightedAverage95": "stars-weighted-average-95",
-} as const;
-
-export const leaderboardVK = {
-    "total-pp": "totalPP",
-    "pass-pp": "passPP",
-    "accuracy-pp": "accPP",
-    "tech-pp": "techPP",
-    "top-pp": "topPP",
-    "ranked-accuracy": "accuracyRankedAverage",
-    "weighted-ranked-accuracy": "accuracyRankedWeightedAverage",
-    "stars-weighted-average-99": "c_starsWeightedAverage99",
-    "stars-weighted-average-98": "c_starsWeightedAverage98",
-    "stars-weighted-average-97": "c_starsWeightedAverage97",
-    "stars-weighted-average-96": "c_starsWeightedAverage96",
-    "stars-weighted-average-95": "c_starsWeightedAverage95",
-} as const;
+export const leaderboardKV = new KVMap([
+    ["totalPP", "total-pp"],
+    ["passPP", "pass-pp"],
+    ["accPP", "accuracy-pp"],
+    ["techPP", "tech-pp"],
+    ["topPP", "top-pp"],
+    ["accuracyRankedAverage", "ranked-accuracy"],
+    ["accuracyRankedWeightedAverage", "weighted-ranked-accuracy"],
+    ["c_starsWeightedAverage99", "stars-weighted-average-99"],
+    ["c_starsWeightedAverage98", "stars-weighted-average-98"],
+    ["c_starsWeightedAverage97", "stars-weighted-average-97"],
+    ["c_starsWeightedAverage96", "stars-weighted-average-96"],
+    ["c_starsWeightedAverage95", "stars-weighted-average-95"],
+])
 
 export const customLeaderboards = async (playerId: string, leaderboard: string) => {
     const accuracy = Number(leaderboard.slice(leaderboard.length - 2, leaderboard.length));
@@ -124,7 +110,7 @@ export const leaderboardFunction = async (client: Client) => {
 
         const messages = await channel.messages.fetch({ limit: 50 });
         const lbs = clan.leaderboards.split(",").filter(l => !!l);
-        const entries = Object.keys(leaderboards).filter(e => lbs.includes(leaderboardKV[e]));
+        const entries = Object.keys(leaderboards).filter(e => lbs.includes(leaderboardKV.get(e)!));
 
         for (let leaderboard of entries) {
             const lb = leaderboard.includes("accuracy") ? "accuracy" :

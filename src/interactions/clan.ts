@@ -1,11 +1,11 @@
-import { ChatInputCommandInteraction, EmbedBuilder, GuildTextBasedChannel, PermissionFlagsBits} from "discord.js";
+import { EmbedBuilder, GuildTextBasedChannel, PermissionFlagsBits} from "discord.js";
 import { User } from "../database";
 import { Logger } from "../utils/logger";
 import Clan from "../database/models/Clan";
 import { Op } from "sequelize";
-import { leaderboardFunction, leaderboardVK, leaderboards } from "./leaderboards";
+import { leaderboardFunction, leaderboardKV, leaderboards } from "./leaderboards";
 import { checkPermission } from "../utils/utils";
-import { Arg, BaseCommand, ChoiceValueObject, Choices, Command, CommandContext, SubCommand, linkDiscordMessage, parseParams } from "../framework";
+import { Arg, BaseCommand, ChoiceValueObject, Choices, Command, CommandContext, SubCommand, parseParams } from "../framework";
 import { RefreshMeCommand } from "./user";
 
 export const logger = new Logger("Clan");
@@ -173,7 +173,7 @@ export class ClanCommands extends BaseCommand {
 
         const settingsField = [
             ...channelTypes.map(t => `${t.name}: ${clan[t.value] ? `<#${clan[t.value]}>` : "N/A"}`),
-            `Leaderboards: ${!lbs.length ? "None" : `\`${lbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `")}\``}`
+            `Leaderboards: ${!lbs.length ? "None" : `\`${lbs.map(l => leaderboards[leaderboardKV.get(l)!]).join("`, `")}\``}`
         ];
 
         const hasAnySettings = channelTypes.find(t => clan[t.value] != null);
@@ -256,7 +256,7 @@ export class ClanCommands extends BaseCommand {
             return;
         }
         
-        const list = clanLbs.map(l => leaderboards[leaderboardVK[l]]).join("`, `");
+        const list = clanLbs.map(l => leaderboards[leaderboardKV.get(l)!]).join("`, `");
         await ctx.edit(`Updated leaderboards list, now displaying:\n\`${list}\``);
 
         if (clan.leaderboards != "") await leaderboardFunction(ctx.interaction.client);

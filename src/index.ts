@@ -1,7 +1,8 @@
 import { APIApplicationCommand, Client, Events, IntentsBitField, Partials, Routes, User } from "discord.js";
-import { Leaderboard, createLeaderboard, createSong, createSongDifficulty, sequelize } from "./database/index.js";
+import sequelize, { Stats, Leaderboard, createLeaderboard, createSong, createSongDifficulty } from "./database/index.js";
 import ModifierRatings, { createModifierRating } from "./database/models/LeaderboardModifierRatings.js";
 import ModifierValues, { createModifierValues } from "./database/models/LeaderboardModifierValues.js";
+import { checkPermission } from "./utils/utils.js";
 import { registerFont } from "canvas";
 import { rmdir, mkdir } from "fs/promises";
 import { join } from "path";
@@ -11,8 +12,6 @@ import cron from "node-cron";
 
 // @ts-ignore
 import { TOKEN, PREFIX, ownerId } from "../config.json";
-import { checkPermission } from "./utils/utils.js";
-import Stats from "./database/models/Stats.js";
 
 export const logger = new Logger("Bot");
 logger.info("Starting...");
@@ -29,11 +28,7 @@ cron.schedule("0 0 * * 0", async () => {
     for (let leaderboard of leaderboards) {
         const { id: leaderboardId } = leaderboard;
         const dbLeaderboard = await Leaderboard.findOne({
-            where: { leaderboardId },
-            include: [
-                ModifierRatings,
-                ModifierValues,
-            ]
+            where: { leaderboardId }
         });
         
         if (!dbLeaderboard) {
