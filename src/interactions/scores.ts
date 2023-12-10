@@ -635,8 +635,8 @@ export class PlaylistCommand {
 
         const player = await ctx.user(false);
         
-        if (all && !player) {
-            await ctx.edit(`Unable to use \`all\` option without a Discord linked.\n${linkDiscordMessage}`);
+        if (!all && !player) {
+            await ctx.edit(`Unable to use \`all:False\` option without a Discord linked.\n${linkDiscordMessage}`);
             return;
         }
 
