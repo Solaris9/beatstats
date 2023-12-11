@@ -1,15 +1,15 @@
 import { Attachment, ButtonBuilder, ButtonInteraction, ChatInputCommandInteraction, Client, Collection, Message, Role, StringSelectMenuBuilder, StringSelectMenuInteraction, User } from "discord.js";
 import { User as DBUser } from "./database";
 import { glob } from "glob";
-import { Logger } from "./utils/logger.js";
+import { Logger } from "./utils/logger";
 import "reflect-metadata"
-import { CreateUserMethod, createUser } from "./database/models/User.js";
+import { CreateUserMethod, createUser } from "./database/models/User";
 
 const logger = new Logger("Loader");
 const MessageCommandSym = Symbol("message command");
 export const linkDiscordMessage = "Please link your Discord account with BeatLeader by going to <https://www.beatleader.xyz/signin/socials>.";
 
-// declare module "./test.js" {
+// declare module "./test {
 //     interface CustomOptions {}
 // }
 
@@ -108,7 +108,8 @@ function typeFor(type: any, target: any, key: string, index: number, defaults?: 
     if (type == Number) return 4;
     if (type == Boolean) return 5;
 
-    switch (type.constructor) {
+    // switch (type.constructor) {
+    switch (type) {
         case User:
             return 6;
         case Role:
@@ -431,12 +432,12 @@ export class CommandContext {
         let discord = this.interaction.user!.id;
         const that = this;
 
-        return async (id?: string | false) => {
+        return async (id?: string | false, exitEarly = false) => {
             if (id) discord = id;
 
             let player = await DBUser.findOne({ where: {  discord } });
             if (!player) {
-                if (id == false) return;
+                if (id == false || exitEarly) return;
                 player = await createUser(CreateUserMethod.Discord, discord);
 
                 if (!player) {
@@ -608,7 +609,7 @@ export function MessageCommand(nameOrFn: string | CommandFunction, fn?: CommandF
 //     const events = [] as (CommandData<EventOptions> & { name: string })[];
 //     const commands = new Collection<string, CommandData["handler"]>();
 
-//     const files = glob.sync("./dist/{events,interactions}/*.js");
+//     const files = glob.sync("./dist/{events,interactions}/*);
 //     for (let file of files) {
 //         const mod = require(`./${file.slice(5)}`);
 //         const entries = Object.entries(mod)

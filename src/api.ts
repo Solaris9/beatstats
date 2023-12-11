@@ -1,5 +1,5 @@
 import Stats from "./database/models/Stats";
-import { IClanContainer, IHistory, ILeaderboard, IPlayer, IResultPagination, IScore, IScoreStats } from "./types/beatleader";
+import { IClanContainer, IHistory, ILeaderboard, IPlayer, IResultPagination, IScore, IScoreStatistic, IScoreStats } from "./types/beatleader";
 import { Logger } from "./utils/logger";
 
 const logger = new Logger("HTTP")
@@ -63,7 +63,9 @@ type BeatLeaderAPI = {
         identity: APIRequest<{ id: string }>;
         token: APIRequest<{ access_token: string }>;
     };
-    score: Dynamic<IScore, Dynamic<false, Dynamic<false, Dynamic<IScore>>>>;
+    score: {
+        statistic: Dynamic<false, APIRequest<IScoreStatistic>>
+    } & Dynamic<IScore, Dynamic<false, Dynamic<false, Dynamic<IScore>>>>;
     clan: {
         invite: APIRequest;
     } & Dynamic<false, APIRequest<IResultPagination<IPlayer, { container: IClanContainer }>>>;

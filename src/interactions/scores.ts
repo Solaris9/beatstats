@@ -1,14 +1,15 @@
-import Discord from "discord.js";
+import Discord, { ActionRowBuilder, AttachmentBuilder, StringSelectMenuInteraction } from "discord.js";
 import { WebSocket } from "ws";
 import { drawCard } from "../drawing/scores/index";
+import drawComparison from "../drawing/comparsion";
 import sequelize, * as DB from "../database";
 import { Op, QueryTypes } from "sequelize";
 import { Query, _Difficulty, _Leaderboard, _Score, _Song, _User } from "../database/manual";
-import { checkPermission, timeAgo } from "../utils/utils.js";
-import { Logger } from "../utils/logger.js";
+import { checkPermission, timeAgo } from "../utils/utils";
+import { Logger } from "../utils/logger";
 import { beatleader } from "../api";
 import { IScore } from "../types/beatleader";
-import { Arg, Choices, SubCommand, Command, ChoiceValueTuple, createStringSelect, CommandContext, linkDiscordMessage } from "../framework.js";
+import { Arg, Choices, SubCommand, Command, ChoiceValueTuple, createStringSelect, CommandContext, linkDiscordMessage } from "../framework";
 
 const logger = new Logger("Live-Scores");
 
@@ -517,5 +518,157 @@ export const onInteractionCreate = async (client: Discord.Client, interaction: D
         await sendScoreCard([id], interaction.channel as Discord.GuildTextBasedChannel, {
             reply: interaction.message
         });
+    }
+}
+
+@Command("compare", "Compare scores with another user.")
+export class CompareCommand {
+    #interactions: Record<string, Discord.ChatInputCommandInteraction> = {};
+
+    async execute(
+        ctx: CommandContext,
+        @Arg("The user to compare scores to.") user: Discord.User
+    ) {
+        await ctx.defer(true);
+
+        const me = await ctx.user();
+        if (!me) return;
+
+        const comparer = await ctx.user(user.id, true);
+        if (!comparer) {
+            await ctx.edit(`${user} does not have Discord linked on their BeatLeader. Please notify them and then run this command again.`);
+            return;
+        }
+
+        await ctx.edit("Fetching scores...");
+
+        await me.refresh();
+        await comparer.refresh();
+
+        const scores = await DB.Score.findAll({
+            where: {
+                playerId: { [Op.in]: [me.beatleader, comparer.beatleader] }
+            },
+            // group: ["Score.leaderboardId"],
+            // having: Sequelize.literal("COUNT(Score.leaderboardId) = 2"),
+            include: [
+                {
+                    model: DB.Leaderboard,
+                    include: [
+                        {
+                            model: DB.SongDifficulty,
+                            include: [ DB.Song ]
+                        }
+                    ]
+                }
+            ]
+        });
+
+        const filtered = scores.filter(s1 => scores.filter(s2 => s1.leaderboardId == s2.leaderboardId).length == 2)
+        const myScores = filtered.filter(s => s.playerId == me.beatleader);
+        const comparerScores = filtered.filter(s => s.playerId == comparer.beatleader);
+
+        const select = createStringSelect(CompareCommand)
+            .setMaxValues(3)
+            .setMinValues(1)
+            .addOptions(myScores.slice(0, 25).map(s => {
+                const difficulty = s.leaderboard!.difficulty;
+                const difficultyName = DB.getDifficultyName(difficulty.difficulty);
+
+                const compared = comparerScores.find(c => c.leaderboardId == s.leaderboardId)!;
+        
+                const meAgo = timeAgo(s.timeSet);
+                const compareAgo = timeAgo(compared.timeSet);
+
+                let description = `${meAgo} vs ${compareAgo}`;
+                
+                if (s.leaderboard!.type == DB.LeaderboardType.Ranked) {
+                    description += ` - ${s.pp.toFixed(2)}pp vs ${compared.pp.toFixed(2)}pp`;
+                } else {
+                    description += ` - ${(s.accuracy * 100).toFixed(2)}% vs ${(compared.accuracy * 100).toFixed(2)}%`;
+                }
+    
+                const difficultyText = `[${difficultyName}]`;
+                let songText = s.leaderboard!.difficulty.song.name;
+    
+                const length = songText.length + 1 + difficultyText.length;
+                if (length > 100) {
+                    const difference = 96 - difficultyText.length;
+                    songText = songText.slice(0, difference) + "...";
+                }
+    
+                return new Discord.StringSelectMenuOptionBuilder({
+                    label: `${songText} ${difficultyText}`,
+                    value: `${me.beatleader}-${comparer.beatleader}-${s.leaderboardId}`,
+                    description
+                });
+            }));
+        
+        const row = new ActionRowBuilder().addComponents(select);
+
+        await ctx.edit({
+            content: `Note: Select is in the format "You vs ${user}" for time-ago, pp and accuracy.`,
+            // @ts-ignore
+            components: [row]
+        });
+    
+        this.#interactions[ctx.interaction.user.id] = ctx.interaction;
+    }
+
+    async onStringSelect(interaction: StringSelectMenuInteraction) {
+        const toCompare = interaction.values.map(v => v.split("-"));
+        const playerIds = [toCompare[0][0], toCompare[0][1]];
+        const leaderboardIds = toCompare.map(v => v[2]);
+
+        const leaderboards = await DB.Leaderboard.findAll({
+            where: { leaderboardId: { [Op.in]: leaderboardIds } },
+            include: [
+                {
+                    model: DB.Score,
+                    as: "scores",
+                    where: { playerId: { [Op.in]: playerIds } },
+                    include: [
+                        {
+                            as: "user",
+                            model: DB.User
+                        }
+                    ]
+                },
+                {
+                    model: DB.SongDifficulty,
+                    include: [ DB.Song ]
+                }
+            ]
+        });
+
+        const promises = leaderboards.map(async l => {
+            const meScore = l.scores.find(s => s.playerId == playerIds[0])!;
+            const compareScore = l.scores.find(s => s.playerId == playerIds[1])!;
+
+            const [
+                meTracker,
+                compareTracker
+            ] = await Promise.all([
+                beatleader.score.statistic[meScore.scoreId].get_json(),
+                beatleader.score.statistic[compareScore.scoreId].get_json(),
+            ]);
+
+            const dataUrl = await drawComparison(l, [meScore, meTracker], [compareScore, compareTracker]); 
+            if (!dataUrl) return;
+
+            const data = dataUrl.split(",")[1];
+            const buffer = Buffer.from(data, "base64");
+            
+            const attachment = new AttachmentBuilder(buffer, {
+                name: `comparison-${playerIds[0]}-${playerIds[1]}-${l.leaderboardId}.png`
+            });
+
+            await interaction.channel!.send({ files: [attachment]})
+        })
+
+        const int = this.#interactions[interaction.user.id];
+        try { await int.deleteReply() } catch { }
+
+        await Promise.all(promises);
     }
 }

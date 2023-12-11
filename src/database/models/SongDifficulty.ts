@@ -1,6 +1,6 @@
-import { Table, Column, Model, BelongsTo, PrimaryKey, Unique } from "sequelize-typescript";
-import { Song, Leaderboard }from "../index.js";
-import { ILeaderboard } from "../../types/beatleader.js";
+import { Table, Column, Model, BelongsTo, PrimaryKey } from "sequelize-typescript";
+import { Song, Leaderboard }from "../index";
+import { ILeaderboard } from "../../types/beatleader";
 
 @Table({ timestamps: false })
 export default class Difficulty extends Model {

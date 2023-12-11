@@ -318,3 +318,59 @@ export interface IClanContainer {
 	averageAccuracy: number;
 	players:         IPlayer[];
 }
+
+export interface IScoreStatisticHitTracker {
+	maxCombo: number;
+	maxStreak: number;
+	leftTiming: number;
+	rightTiming: number;
+	leftMiss: number;
+	rightMiss: number;
+	leftBadCuts: number;
+	rightBadCuts: number;
+	leftBombs: number;
+	rightBombs: number;
+}
+
+export interface IScoreStatisticAccuracyTracker {
+	accRight: number;
+	accLeft: number;
+	leftPreswing: number;
+	rightPreswing: number;
+	averagePreswing: number;
+	leftPostswing: number;
+	rightPostswing: number;
+	rightTimeDependence: number;
+	leftTimeDependence: number;
+	leftAverageCut: [number, number, number];
+	rightAverageCut: [number, number, number];
+	gridAcc: [
+		number, number, number, number,
+		number, number, number, number,
+		number, number, number, number
+	];
+	fcAcc: number;
+}
+
+export interface IScoreStatisticWinTracker {
+	won: boolean;
+	endTime: number;
+	nbOfPause: number;
+	totalPauseDuration: number;
+	jumpDistance: number;
+	averageHeight: number;
+	averageHeadPosition: Record<"x" | "y" | "z", number>;
+	totalScore: number;
+	maxScore: number;
+}
+
+export interface IScoreStatisticScoreGraphTracker {
+	graph: number[];
+}
+
+export interface IScoreStatistic {
+	hitTracker: IScoreStatisticHitTracker;
+	accuracyTracker: IScoreStatisticAccuracyTracker;
+	winTracker: IScoreStatisticWinTracker;
+	scoreGraphTracker: IScoreStatisticScoreGraphTracker;
+}

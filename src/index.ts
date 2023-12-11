@@ -1,13 +1,13 @@
 import { APIApplicationCommand, Client, Events, IntentsBitField, Partials, Routes, User } from "discord.js";
-import sequelize, { Stats, Leaderboard, createLeaderboard, createSong, createSongDifficulty } from "./database/index.js";
-import ModifierRatings, { createModifierRating } from "./database/models/LeaderboardModifierRatings.js";
-import ModifierValues, { createModifierValues } from "./database/models/LeaderboardModifierValues.js";
-import { checkPermission } from "./utils/utils.js";
+import sequelize, { Stats, Leaderboard, createLeaderboard, createSong, createSongDifficulty } from "./database/index";
+import { createModifierRating } from "./database/models/LeaderboardModifierRatings";
+import { createModifierValues } from "./database/models/LeaderboardModifierValues";
+import { checkPermission } from "./utils/utils";
 import { registerFont } from "canvas";
 import { rmdir, mkdir } from "fs/promises";
 import { join } from "path";
-import { Logger } from "./utils/logger.js";
-import load from "./framework.js";
+import { Logger } from "./utils/logger";
+import load from "./framework";
 import cron from "node-cron";
 
 // @ts-ignore

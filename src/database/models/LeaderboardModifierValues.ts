@@ -1,7 +1,7 @@
 import { Table, Unique, Column, Model, BelongsTo } from "sequelize-typescript";
-import { LeaderboardType } from "./Leaderboard.js";
-import { Leaderboard } from "../index.js";
-import { IDifficulty } from "../../types/beatleader.js";
+import { LeaderboardType } from "./Leaderboard";
+import { Leaderboard } from "../index";
+import { IDifficulty } from "../../types/beatleader";
 
 @Table({ timestamps: false })
 export default class ModifierValues extends Model {

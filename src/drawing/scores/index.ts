@@ -1,8 +1,10 @@
 import { AttachmentBuilder } from "discord.js";
-import { Score } from "../../database";
+import { Leaderboard, LeaderboardType, Score, ScoreImprovement, Song, User } from "../../database";
 import { writeFile, readFile, mkdir } from "fs/promises";
 import { exists } from "../../utils/utils";
 import minimal from "./minimal";
+import { Op, col } from "sequelize";
+import Difficulty from "../../database/models/SongDifficulty";
 
 const types = ["minimal"] as const;
 type Types = typeof types[number];
@@ -15,7 +17,7 @@ const map: Record<Types, Draw> = {
 export const drawCard = async (type: Types, score: Score) => {
     const leaderboardPath = `./image-cache/cards/${score.leaderboardId}`;
     const cardPath = `${leaderboardPath}/${score.scoreId}.png`;
-    const cardExists = await exists(cardPath);
+    const cardExists = false;//await exists(cardPath);
 
     let buffer: Buffer;
 
@@ -40,8 +42,14 @@ export const drawCard = async (type: Types, score: Score) => {
 
 // Score.findAll({
 //     limit: 1,
-//     order: [[col("timeSet"), "desc"]],
 //     include: [
+//         {
+//             model: ScoreImprovement,
+//             as: "scoreImprovement",
+//             where: {
+//                 pp: { [Op.gt]: 0 }
+//             }
+//         },
 //         {
 //             model: User,
 //             as: "user"
@@ -59,6 +67,6 @@ export const drawCard = async (type: Types, score: Score) => {
 //         }
 //     ]
 // }).then(async scores => {
-//     console.log(scores[0].toJSON());
+//     // console.log(scores[0].toJSON());
 //     await drawCard("minimal", scores[0]);
 // });

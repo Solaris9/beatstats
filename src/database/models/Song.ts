@@ -1,6 +1,6 @@
 import { Table, Unique, PrimaryKey, Column, Model, HasMany, BelongsTo } from "sequelize-typescript";
-import { SongDifficulty } from "../index.js";
-import { ISong } from "../../types/beatleader.js";
+import { SongDifficulty } from "../index";
+import { ISong } from "../../types/beatleader";
 
 @Table({ timestamps: false })
 export default class Song extends Model {

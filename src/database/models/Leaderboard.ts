@@ -1,7 +1,7 @@
 import { AllowNull, BelongsTo, Column, DataType, HasMany, HasOne, Model, PrimaryKey, Table, Unique } from "sequelize-typescript";
-import { Score, SongDifficulty, LeaderboardModifierRatings, LeaderboardModifierValues } from "../index.js";
-import { ILeaderboard } from "../../types/beatleader.js";
-import { beatleader } from "../../api.js";
+import { Score, SongDifficulty, LeaderboardModifierRatings, LeaderboardModifierValues } from "../index";
+import { ILeaderboard } from "../../types/beatleader";
+import { beatleader } from "../../api";
 
 export enum LeaderboardType {
     Unranked = 0,

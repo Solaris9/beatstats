@@ -1,10 +1,10 @@
 import { AllowNull, Column, Default, Model, Table, Unique } from "sequelize-typescript";
-import { beatleader } from "../../api.js";
-import { IPlayer } from "../../types/beatleader.js";
+import { beatleader } from "../../api";
+import { IPlayer } from "../../types/beatleader"
 import { DataTypes, Op } from "sequelize";
-import Score from "./Score.js";
-import User, { CreateUserMethod, createUser } from "./User.js";
-import { logger } from "../../interactions/clan.js";
+import Score from "./Score";
+import User, { CreateUserMethod, createUser } from "./User";
+import { logger } from "../../interactions/clan";
 
 @Table
 export default class Clan extends Model {

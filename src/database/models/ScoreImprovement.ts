@@ -1,5 +1,5 @@
 import { Table, Column, Model, BelongsTo, Unique } from "sequelize-typescript";
-import { Score } from "../index.js";
+import { Score } from "../index";
 
 @Table({ timestamps: false })
 export default class ScoreImprovement extends Model {

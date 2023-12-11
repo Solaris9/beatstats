@@ -25,8 +25,10 @@ export function trim(template: TemplateStringsArray, ...args: any[]) {
         .join("\n");
 }
 
-export function timeAgo(time: number) {
-    const difference = (Date.now() / 1000) - time;
+export function timeAgo(time: Date): string;
+export function timeAgo(time: number): string;
+export function timeAgo(time: Date | number): string {
+    const difference = (Date.now() / 1000) - (typeof time == "number" ? time : time.getTime());
 
     const intl = new Intl.RelativeTimeFormat("en");
 
@@ -98,7 +100,7 @@ export class KVMap<T> extends Map<T, T> {
     public set(key: T, value: T) {
         super.set(key, value);
         super.set(value, key);
-        
+
         return this;
     }
 }

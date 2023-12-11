@@ -1,16 +1,16 @@
 import { Sequelize } from 'sequelize-typescript';
 
-import LeaderboardModifierValues, { createModifierValues, getModifier } from "./models/LeaderboardModifierValues.js";
-import LeaderboardModifierRatings, { createModifierRating } from "./models/LeaderboardModifierRatings.js";
-import Leaderboard, { createLeaderboard, LeaderboardType } from "./models/Leaderboard.js";
-import ScoreOffsets from "./models/ScoreOffsets.js";
-import ScoreImprovement from "./models/ScoreImprovement.js";
-import Score, { createScore } from "./models/Score.js";
-import SongDifficulty, { createSongDifficulty, getDifficultyName, getModeName } from "./models/SongDifficulty.js";
-import Song, { createSong } from "./models/Song.js";
-import User, { createUser, CreateUserMethod } from "./models/User.js";
-import Clan from "./models/Clan.js";
-import Stats from "./models/Stats.js";
+import LeaderboardModifierValues, { createModifierValues, getModifier } from "./models/LeaderboardModifierValues";
+import LeaderboardModifierRatings, { createModifierRating } from "./models/LeaderboardModifierRatings";
+import Leaderboard, { createLeaderboard, LeaderboardType } from "./models/Leaderboard";
+import ScoreOffsets from "./models/ScoreOffsets";
+import ScoreImprovement from "./models/ScoreImprovement";
+import Score, { createScore } from "./models/Score";
+import SongDifficulty, { createSongDifficulty, getDifficultyName, getModeName } from "./models/SongDifficulty";
+import Song, { createSong } from "./models/Song";
+import User, { createUser, CreateUserMethod } from "./models/User";
+import Clan from "./models/Clan";
+import Stats from "./models/Stats";
 
 export {
     Stats,

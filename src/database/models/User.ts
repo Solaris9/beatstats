@@ -1,13 +1,9 @@
 import { AllowNull, Column, HasMany, Model, PrimaryKey, Table, Unique } from "sequelize-typescript";
-import { Score, createLeaderboard, createModifierRating, createModifierValues, createScore, createSong, createSongDifficulty } from "../index.js";
-import { beatleader } from "../../api.js";
-import { YoutubeFeed } from "../../types/other.js";
-import { IPlayer, IScore } from "../../types/beatleader.js";
+import { Score, createLeaderboard, createModifierRating, createModifierValues, createScore, createSong, createSongDifficulty } from "../index";
+import { beatleader } from "../../api";
+import { IPlayer, IScore } from "../../types/beatleader";
 import { DataTypes, Op } from "sequelize";
-// @ts-ignore
-import { BL_COOKIE } from "../../../config.json";
-import parse from "rss-to-json";
-import { Logger } from "../../utils/logger.js";
+import { Logger } from "../../utils/logger";
 
 const logger = new Logger("User");
 
@@ -88,21 +84,6 @@ export default class User extends Model {
         }
 
         await this.save();
-    }
-
-    async invite() {
-        try {
-            const res = await beatleader.clan.invite.post({
-                query: { player: this.beatleader },
-                headers: {
-                    cookie: `.AspNetCore.Cookies=${BL_COOKIE}`
-                }
-            });
-
-            return res.ok;
-        } catch {
-            return false;
-        }
     }
 
     async fetchScores(lastScoreDate?: number | null) {

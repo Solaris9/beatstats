@@ -1,7 +1,7 @@
 import { Table, Column, BelongsTo, Model, HasOne, PrimaryKey, Unique, Default } from 'sequelize-typescript';
 import { Op } from 'sequelize';
-import { ScoreOffsets, Leaderboard, ScoreImprovement, User } from "../index.js";
-import { IScore } from "../../types/beatleader.js";
+import { ScoreOffsets, Leaderboard, ScoreImprovement, User } from "../index";
+import { IScore } from "../../types/beatleader";
 
 @Table({ timestamps: false })
 export default class Score extends Model {
