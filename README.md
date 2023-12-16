@@ -17,7 +17,7 @@ Unofficial BeatLeader Discord bot integration
 It's possible to self-host the bot with these steps.
 
 1. Install Node 18 or newer (or use NVM, Node Version Manager)
-    - `mvm install 18` -> `nvm use 18`
+    - `nvm install 18` -> `nvm use 18`
 2. Run `yarn install`
 3. Run `yarn build`
 4. Create a bot and get the token and application ID.
