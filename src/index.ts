@@ -4,7 +4,7 @@ import { createModifierRating } from "./database/models/LeaderboardModifierRatin
 import { createModifierValues } from "./database/models/LeaderboardModifierValues";
 import { checkPermission } from "./utils/utils";
 import { registerFont } from "canvas";
-import { rmdir, mkdir } from "fs/promises";
+import { rm, mkdir } from "fs/promises";
 import { join } from "path";
 import { Logger } from "./utils/logger";
 import load from "./framework";
@@ -18,7 +18,7 @@ logger.info("Starting...");
 
 cron.schedule("0 0 * * *", async () => {
     const dir = join(process.cwd(), "image-cache", "cards");
-    await rmdir(dir);
+    await rm(dir, { recursive: true });
     await mkdir(dir);
 });
 
@@ -169,9 +169,11 @@ sequelize.sync()
 
         for (let command of commands) {
             const int = interactions.get(command.name);
-            int!.__id = command.id;
-            // @ts-ignore
-            int!.constructor.id = command.id;
+            if (int) {
+                int!.__id = command.id;
+                // @ts-ignore
+                int!.constructor.id = command.id;
+            }
         }
     });
 

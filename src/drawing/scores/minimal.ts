@@ -139,6 +139,7 @@ export default async (score: Score) => {
     }
 
     //#endregion
+  
     const isScoreImprovement = score.scoreImprovement && (score.scoreImprovement.score != 0 || score.scoreImprovement.pp != 0);
 
     const scoreGrid = createGrid({
@@ -158,16 +159,20 @@ export default async (score: Score) => {
 
         if (opts.column == 0 && opts.row == 0) colour = "#8992E8"
         else if (opts.column == 1 && opts.row == 0) colour = getColour(score.accuracy)!;
-        else if (opts.column == 2 && opts.row == 0) colour = "#737373";
         else if (opts.column == 0 && opts.row == 1) colour = "#A82020";
         else if (opts.column == 1 && opts.row == 1) colour = "#2064A8";
         else colour = "#737373";
         
+        if (
+            opts.column == 0 && opts.row == 0 && score.leaderboard!.type == LeaderboardType.Unranked ||
+            opts.column == 0 && opts.row == 1 && score.accLeft == 0 ||
+            opts.column == 1 && opts.row == 1 && score.accRight == 0
+        ) return;
+
         image.add(draw({ colour }));
 
         if (opts.row == 0) {
             const offset = isScoreImprovement ? 25 : 0;
-            // opts.y += 5;
             
             if (opts.column == 0 && score.leaderboard!.type != LeaderboardType.Unranked) {
                 image.add(centerText(scorePoints, 40, diff(opts, 'y', offset)));
@@ -186,7 +191,7 @@ export default async (score: Score) => {
                     
                     image.add(centerText(`${accChange}${accImprovement}%`, 35, diff(opts, 'y', -offset)));
                 }
-            } else {
+            } else if (opts.column == 2){
                 const { format } = new Intl.NumberFormat("en");
                 image.add(centerText(format(scoreScore), 40, diff(opts, 'y', offset)));
 
@@ -207,7 +212,7 @@ export default async (score: Score) => {
             } else if (opts.column == 1) {
                 base = scoreRight;
                 if (isScoreImprovement) improve = ` ${score.scoreImprovement!.accRight > 0 ? "+" : ""}${score.scoreImprovement!.accRight.toFixed(2)}`;
-            } else {
+            } else if (opts.column == 2) {
                 base = scoreCombo;
                 if (isScoreImprovement) {
                     const mistakes = (score.badCuts + score.missedNotes) - score.scoreImprovement!.badCuts - score.scoreImprovement!.missedNotes;
@@ -216,7 +221,7 @@ export default async (score: Score) => {
             }
 
             if (improve) {
-                const baseWidth = measure(base, 37.5).width;
+                const baseWidth = measure(base!, 37.5).width;
 
                 image.add(centerText(improve, 32.5, {
                     ...opts,
@@ -227,14 +232,14 @@ export default async (score: Score) => {
             }
             
             const improveWidth = improve ? measure(improve, 32.5).width : 0;
-            image.add(centerText(base, 37.5, { ...opts, width: scoreGrid.entryWidth - improveWidth }));
+            image.add(centerText(base!, 37.5, { ...opts, width: scoreGrid.entryWidth - improveWidth }));
         }
     });
 
     scoreGrid.set("x", image.width - scoreGrid.maxWidth - 5);
     scoreGrid.set("y", image.height - scoreGrid.maxHeight - 5 - 30);
 
-    scoreGrid.draw()
+    scoreGrid.draw();
 
     //#region player
 
@@ -243,7 +248,7 @@ export default async (score: Score) => {
         playerAvatarImage,
         playerCountryImage,
         score,
-        leftCol: image.width - scoreGrid.maxWidth + padding
+        remaining: image.width - scoreGrid.maxWidth + 20
     });
 
     //#endregion

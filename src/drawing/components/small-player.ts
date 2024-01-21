@@ -18,7 +18,7 @@ type Options = {
     score: Score,
     playerAvatarImage: PromiseFulfilledResult<Image>;
     playerCountryImage: PromiseFulfilledResult<Image>;
-    leftCol: number;
+    remaining: number;
 }
 
 export default async (layer: Layer, {
@@ -28,7 +28,7 @@ export default async (layer: Layer, {
     score,
     playerAvatarImage,
     playerCountryImage,
-    leftCol
+    remaining
 }: Options) => {
     const width = 1500;
     const padding = 20;
@@ -46,7 +46,7 @@ export default async (layer: Layer, {
         x: x + padding,
         y: y + height - (padding * 3) - avatarSize,
         height: avatarSize + (padding * 2),
-        width: width - leftCol - padding,
+        width: width - remaining,
         fill: "rgba(0, 0, 0, 0.5)",
         cornerRadius: 20
     });
@@ -74,7 +74,7 @@ export default async (layer: Layer, {
         fontSize: 50
     });
 
-    const playerRemaining = width - leftCol - (padding + avatarSize)
+    const playerRemaining = remaining - ((padding * 2) + avatarSize)
     truncate(playerNameText, playerName, playerRemaining);
 
     const playerHMDImage = await KonvaImageFromURL(`data:image/png;base64,${HMDIconRaw}`);

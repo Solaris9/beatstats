@@ -129,7 +129,7 @@ export default async (layer: Layer, {
 
     if (leaderboard.type != LeaderboardType.Ranked) difficultyMetadata.splice(0, 1);
 
-    let metadataLastWidth = 15 + difficultyText.measureSize(songDifficulty).width;;
+    let metadataLastWidth = 15 + difficultyText.measureSize(songDifficulty).width;
 
     for (const [text, name, inc = 0] of difficultyMetadata) {
         const metadataIcon = await KonvaImageFromURL(`data:image/png;base64,${icons[name]}`);

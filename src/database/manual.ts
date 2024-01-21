@@ -176,7 +176,8 @@ export const _Score = model("Score", {
     leaderboardId: "number",
     accuracy: "number",
     pp: "number",
-    timeSet: "date"
+    timeSet: "date",
+    context: "number",
 });
 
 export const _Leaderboard = model("Leaderboard", {
